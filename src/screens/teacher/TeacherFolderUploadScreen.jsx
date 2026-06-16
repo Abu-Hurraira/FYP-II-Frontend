@@ -1,27 +1,52 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { deleteCourseFolderFile, getFolderFiles, uploadFileToCourseFolder } from "../../api/teacherApi";
+import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import { stripFolderTemplatePrefix } from "../../utils/helpers";
+import { filterCategoriesByAllocation } from "../../utils/uploadAllocationHelpers";
 import theme from "../../styles/theme";
 
 export default function TeacherFolderUploadScreen() {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
-  const { folder, teacherUserId: stateT, isLocked, courseTitle, folderSubmissionStatus, rejectionReason } =
+  const { folder, teacherUserId: stateT, isLocked, courseTitle, folderSubmissionStatus, rejectionReason, offeredCourseId } =
     location.state || {};
 
   const teacherUserId = stateT != null ? stateT : user?.userId;
 
   const [files, setFiles] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(
-    folder?.allowedFileCategories?.[0] || "Other"
-  );
+  const [allocation, setAllocation] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const allowedCategories = useMemo(() => {
+    if (!folder?.allowedFileCategories) return [];
+    if (!offeredCourseId || !allocation) return folder.allowedFileCategories;
+    return filterCategoriesByAllocation(folder.allowedFileCategories, offeredCourseId, allocation);
+  }, [folder, offeredCourseId, allocation]);
+
+  useEffect(() => {
+    if (!allowedCategories.length) return;
+    if (!allowedCategories.includes(selectedCategory)) {
+      setSelectedCategory(allowedCategories[0]);
+    }
+  }, [allowedCategories, selectedCategory]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const config = await getHodUploadAllocation();
+        setAllocation(config);
+      } catch {
+        setAllocation({ configured: false, allocations: {} });
+      }
+    })();
+  }, []);
 
   const loadFiles = useCallback(async () => {
     if (!folder?.directoryId) {
@@ -140,8 +165,11 @@ export default function TeacherFolderUploadScreen() {
 
       <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <p className="mb-2 font-extrabold text-gray-900">File Category</p>
+        {allowedCategories.length === 0 ? (
+          <p className="text-sm text-gray-500">No upload categories allocated for you in this folder.</p>
+        ) : (
         <div className="flex flex-wrap gap-2">
-          {folder.allowedFileCategories.map((category) => (
+          {allowedCategories.map((category) => (
             <button
               key={category}
               type="button"
@@ -159,9 +187,10 @@ export default function TeacherFolderUploadScreen() {
             </button>
           ))}
         </div>
+        )}
       </div>
 
-      {!isLocked && (
+      {!isLocked && allowedCategories.length > 0 && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <label className="block cursor-pointer rounded-lg bg-gray-100 p-3 text-gray-600">
             <input type="file" className="hidden" onChange={pickFile} />

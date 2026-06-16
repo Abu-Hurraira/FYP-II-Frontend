@@ -1,9 +1,11 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getCourseMenu } from "../../api/teacherApi";
+import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
+import { canAccessWeeklyContent } from "../../utils/uploadAllocationHelpers";
 
 import weeklyUrl from "../../../assets/WeeklyContentIcon.png";
 import attUrl from "../../../assets/AttendanceIcon.png";
@@ -26,12 +28,17 @@ export default function TeacherCourseMenuScreen() {
 
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
+  const [allocation, setAllocation] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadCourse = useCallback(async () => {
     try {
-      const data = await getCourseMenu(offeredCourseId);
+      const [data, allocationConfig] = await Promise.all([
+        getCourseMenu(offeredCourseId),
+        getHodUploadAllocation(),
+      ]);
       setCourse(data);
+      setAllocation(allocationConfig);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -44,7 +51,7 @@ export default function TeacherCourseMenuScreen() {
   }, [loadCourse]);
 
   const items = [
-    {
+    canAccessWeeklyContent(offeredCourseId, allocation) && {
       title: "Weekly Content",
       icon: weeklyUrl,
       onPress: () =>
@@ -52,37 +59,7 @@ export default function TeacherCourseMenuScreen() {
           `/teacher/course/${offeredCourseId}/weekly-content?teacherUserId=${teacherUserId ?? ""}&courseTitle=${encodeURIComponent(course?.courseTitle || "")}`
         ),
     },
-    // {
-    //   title: "Attendance",
-    //   icon: attUrl,
-    //   onPress: () => navigate("/teacher/placeholder?title=Attendance"),
-    // },
-    // {
-    //   title: "Assignments",
-    //   icon: assignUrl,
-    //   onPress: () => navigate("/teacher/placeholder?title=Assignments"),
-    // },
-    // {
-    //   title: "Quizzes",
-    //   icon: quizUrl,
-    //   onPress: () => navigate("/teacher/placeholder?title=Quizzes"),
-    // },
-    // {
-    //   title: "Results",
-    //   icon: resUrl,
-    //   onPress: () => navigate("/teacher/placeholder?title=Results"),
-    // },
-    // {
-    //   title: "Lesson Plans",
-    //   icon: lessonUrl,
-    //   onPress: () => navigate("/teacher/placeholder?title=Lesson Plans"),
-    // },
-    // {
-    //   title: "CLOs",
-    //   icon: cloUrl,
-    //   onPress: () => navigate("/teacher/placeholder?title=CLOs"),
-    // },
-  ];
+  ].filter(Boolean);
 
   if (loading) {
     return (
@@ -118,6 +95,11 @@ export default function TeacherCourseMenuScreen() {
               <span className="text-xl text-gray-300">›</span>
             </button>
           ))}
+          {items.length === 0 && (
+            <p className="py-16 text-center text-sm text-gray-500">
+              No menu items allocated for this course. Contact your HOD.
+            </p>
+          )}
         </div>
       </div>
     </div>

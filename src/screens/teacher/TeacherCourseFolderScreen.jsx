@@ -6,6 +6,7 @@ import {
   submitCourseFolder,
   validateCourseFolder,
 } from "../../api/teacherApi";
+import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
@@ -14,6 +15,10 @@ import { stripFolderTemplatePrefix } from "../../utils/helpers";
 import {
   teacherFolderSubmissionStatus,
 } from "../../utils/weeklyProgressHelpers";
+import {
+  canTeacherUpload,
+  hasAnyFolderUploadPermission,
+} from "../../utils/uploadAllocationHelpers";
 
 export default function TeacherCourseFolderScreen() {
   const { user } = useContext(AuthContext);
@@ -26,12 +31,17 @@ export default function TeacherCourseFolderScreen() {
 
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
+  const [allocation, setAllocation] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadOverview = useCallback(async () => {
     try {
-      const result = await getCourseFolderOverview(offeredCourseId);
+      const [result, allocationConfig] = await Promise.all([
+        getCourseFolderOverview(offeredCourseId),
+        getHodUploadAllocation(),
+      ]);
       setOverview(result);
+      setAllocation(allocationConfig);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -97,9 +107,30 @@ export default function TeacherCourseFolderScreen() {
     );
   }
 
-  const showSubmit = overview?.isCreated && !overview?.isLocked;
+  const showSubmit =
+    overview?.isCreated &&
+    !overview?.isLocked &&
+    canTeacherUpload(offeredCourseId, "folderTemplate", allocation);
   const folderStatus = overview ? teacherFolderSubmissionStatus(overview) : "In Progress";
   const rejectionReason = overview?.rejectionReason ?? overview?.RejectionReason ?? "";
+  const canAccessFolders = hasAnyFolderUploadPermission(offeredCourseId, allocation);
+  const canCreateFolder = canTeacherUpload(offeredCourseId, "folderTemplate", allocation);
+
+  if (!loading && overview && allocation && !canAccessFolders) {
+    return (
+      <div className="min-h-full bg-page">
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
+          <PageBackButton className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-xl font-semibold text-gray-900">{overview.courseTitle || "Folder"}</h1>
+          </div>
+        </div>
+        <p className="px-4 py-16 text-center text-sm text-gray-500 sm:px-6">
+          You are not allocated folder uploads for this course. Contact your HOD.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-full bg-page">
@@ -123,13 +154,19 @@ export default function TeacherCourseFolderScreen() {
       {!overview?.isCreated ? (
         <div className="mx-4 mt-6 rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm sm:mx-6 lg:mx-8">
           <p className="text-gray-600">MasterFolder has not been created yet.</p>
-          <button
-            type="button"
-            onClick={handleCreate}
-            className="mt-5 rounded-lg bg-brand px-6 py-3 font-extrabold text-white"
-          >
-            Create MasterFolder
-          </button>
+          {canCreateFolder ? (
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="mt-5 rounded-lg bg-brand px-6 py-3 font-extrabold text-white"
+            >
+              Create MasterFolder
+            </button>
+          ) : (
+            <p className="mt-4 text-sm text-gray-500">
+              Folder Template allocation is required to create the master folder.
+            </p>
+          )}
         </div>
       ) : (
         <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
@@ -167,6 +204,7 @@ export default function TeacherCourseFolderScreen() {
                   state: {
                     folder,
                     teacherUserId,
+                    offeredCourseId,
                     isLocked: overview.isLocked,
                     courseTitle: overview.courseTitle,
                     folderSubmissionStatus: folderStatus,

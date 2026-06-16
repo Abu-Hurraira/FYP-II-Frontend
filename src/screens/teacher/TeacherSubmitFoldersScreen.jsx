@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getTeacherSubmissionCourses, enrichCoursesWithFolderReview } from "../../api/teacherApi";
+import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
@@ -9,6 +10,7 @@ import {
   teacherFolderStatusBadgeClass,
   teacherFolderSubmissionStatus,
 } from "../../utils/weeklyProgressHelpers";
+import { hasAnyFolderUploadPermission } from "../../utils/uploadAllocationHelpers";
 
 export default function TeacherSubmitFoldersScreen() {
   const { user } = useContext(AuthContext);
@@ -28,9 +30,15 @@ export default function TeacherSubmitFoldersScreen() {
     }
 
     try {
-      const result = await getTeacherSubmissionCourses(teacherUserId);
+      const [result, allocation] = await Promise.all([
+        getTeacherSubmissionCourses(teacherUserId),
+        getHodUploadAllocation(),
+      ]);
       const enriched = await enrichCoursesWithFolderReview(result);
-      setCourses(enriched);
+      const allowed = enriched.filter((item) =>
+        hasAnyFolderUploadPermission(item.offeredCourseId, allocation)
+      );
+      setCourses(allowed);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -89,6 +97,11 @@ export default function TeacherSubmitFoldersScreen() {
               </button>
             );
             })}
+            {courses.length === 0 && (
+              <p className="py-16 text-center text-sm text-gray-500">
+                No folder upload access assigned. Contact your HOD from the Allocation tab.
+              </p>
+            )}
           </div>
         )}
       </div>
