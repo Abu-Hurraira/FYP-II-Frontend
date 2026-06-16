@@ -9,3 +9,5 @@ export const loginUser = async (email, password) => {
     }),
   });
 };
+
+// export const registerUser = async (email, password) => {//
