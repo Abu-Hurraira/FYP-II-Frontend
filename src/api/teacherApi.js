@@ -123,6 +123,49 @@ export async function getTeacherSubmissionCourses(teacherUserId) {
   return await request(`/TeacherSubmission/teacher/${teacherUserId}/courses`);
 }
 
+/** Attach folder lock + HOD review fields from each course overview. */
+export async function enrichCoursesWithFolderReview(courses = [], { concurrency = 4 } = {}) {
+  const list = Array.isArray(courses) ? [...courses] : [];
+  if (!list.length) return [];
+
+  let nextIndex = 0;
+
+  const runWorker = async () => {
+    while (nextIndex < list.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const course = list[index];
+      const offeredCourseId = course.offeredCourseId ?? course.OfferedCourseId;
+      if (!offeredCourseId) continue;
+
+      try {
+        const overview = await getCourseFolderOverview(offeredCourseId);
+        list[index] = {
+          ...course,
+          isLocked: overview.isLocked ?? overview.IsLocked ?? course.isLocked,
+          reviewStatus:
+            overview.reviewStatus ??
+            overview.ReviewStatus ??
+            overview.submissionReviewStatus ??
+            overview.SubmissionReviewStatus ??
+            overview.hodReviewStatus ??
+            overview.HodReviewStatus ??
+            course.reviewStatus,
+          rejectionReason:
+            overview.rejectionReason ?? overview.RejectionReason ?? course.rejectionReason,
+          folderStatus: overview.folderStatus ?? overview.FolderStatus ?? course.folderStatus,
+        };
+      } catch {
+        // Keep course row without review fields.
+      }
+    }
+  };
+
+  const workers = Math.min(concurrency, list.length);
+  await Promise.all(Array.from({ length: workers }, () => runWorker()));
+  return list;
+}
+
 export async function getCourseFolderOverview(offeredCourseId) {
   return await request(`/TeacherSubmission/offered-course/${offeredCourseId}`);
 }

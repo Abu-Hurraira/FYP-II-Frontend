@@ -9,6 +9,7 @@ const MAIN_TAB_PATHS = new Set([
   "/admin/audit",
   "/teacher",
   "/teacher/profile",
+  "/teacher/notifications",
   "/teacher/submit-folders",
   "/teacher/placeholder",
   "/section-admin",
@@ -19,6 +20,8 @@ const MAIN_TAB_PATHS = new Set([
   "/hod/courses",
   "/hod/programs",
   "/hod/graders",
+  "/hod/allocation",
+  "/hod/submitted-folders",
   "/hod/profile",
 ]);
 

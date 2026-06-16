@@ -66,6 +66,32 @@ function SidebarIconUser() {
   );
 }
 
+function SidebarIconFolder() {
+  return (
+    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+      />
+    </svg>
+  );
+}
+
+function SidebarIconClipboard() {
+  return (
+    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+      />
+    </svg>
+  );
+}
+
 export default function HodLayout() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -107,6 +133,17 @@ export default function HodLayout() {
           <NavLink to="/hod/graders" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
             <SidebarIconUsers />
             Graders
+          </NavLink>
+          <NavLink to="/hod/allocation" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+            <SidebarIconClipboard />
+            Allocation
+          </NavLink>
+          <NavLink
+            to="/hod/submitted-folders"
+            className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}
+          >
+            <SidebarIconFolder />
+            Submitted Folders
           </NavLink>
           <NavLink to="/hod/profile" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
             <SidebarIconUser />

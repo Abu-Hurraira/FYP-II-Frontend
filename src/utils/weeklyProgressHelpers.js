@@ -59,13 +59,61 @@ export function progressBarColor(percentage) {
 }
 
 export function folderStatusLabel(course) {
-  const locked =
-    course?.isFolderLocked ??
-    course?.isLocked ??
-    course?.folderSubmitted ??
-    course?.isSubmitted ??
-    false;
-  const status = course?.folderStatus ?? course?.submissionStatus ?? "";
-  if (locked || status === "Submitted") return "Submitted";
-  return "Open";
+  const status = teacherFolderSubmissionStatus(course);
+  if (status === "In Progress") return "Open";
+  return status;
+}
+
+export function isSubmittedFolder(course) {
+  const status = teacherFolderSubmissionStatus(course);
+  return status === "Submitted" || status === "Approved";
+}
+
+export function folderReviewStatusFromRecord(record) {
+  return String(
+    record?.hodReviewStatus ??
+      record?.HodReviewStatus ??
+      record?.reviewStatus ??
+      record?.ReviewStatus ??
+      record?.submissionReviewStatus ??
+      record?.SubmissionReviewStatus ??
+      ""
+  ).trim();
+}
+
+export function isFolderLockedRecord(record) {
+  const locked = Boolean(
+    record?.isFolderLocked ??
+      record?.isLocked ??
+      record?.IsLocked ??
+      record?.folderSubmitted ??
+      record?.isSubmitted ??
+      false
+  );
+  const status = String(
+    record?.folderStatus ?? record?.FolderStatus ?? record?.submissionStatus ?? ""
+  ).toLowerCase();
+  return locked || status === "submitted";
+}
+
+/** Teacher-facing folder submission status for list badges and banners. */
+export function teacherFolderSubmissionStatus(record) {
+  const review = folderReviewStatusFromRecord(record).toLowerCase();
+  if (review === "approved") return "Approved";
+  if (review === "rejected") return "Rejected";
+  if (isFolderLockedRecord(record)) return "Submitted";
+  return "In Progress";
+}
+
+export function teacherFolderStatusBadgeClass(status) {
+  switch (status) {
+    case "Approved":
+      return "bg-emerald-100 text-emerald-800";
+    case "Rejected":
+      return "bg-red-100 text-red-800";
+    case "Submitted":
+      return "bg-blue-100 text-blue-800";
+    default:
+      return "bg-amber-100 text-amber-900";
+  }
 }

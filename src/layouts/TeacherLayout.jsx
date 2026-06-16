@@ -81,7 +81,7 @@ export default function TeacherLayout() {
             Attendance
           </NavLink>
           <NavLink
-            to="/teacher/placeholder?title=Notifications"
+            to="/teacher/notifications"
             className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}
           >
             <SidebarIconBell />

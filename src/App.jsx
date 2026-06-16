@@ -19,6 +19,7 @@ import TeacherCourseFolderScreen from "./screens/teacher/TeacherCourseFolderScre
 import TeacherFolderUploadScreen from "./screens/teacher/TeacherFolderUploadScreen.jsx";
 import TeacherSynchronizationScreen from "./screens/teacher/TeacherSynchronizationScreen.jsx";
 import TeacherProfileScreen from "./screens/teacher/TeacherProfileScreen.jsx";
+import TeacherNotificationsScreen from "./screens/teacher/TeacherNotificationsScreen.jsx";
 
 import ProfileScreen from "./screens/common/ProfileScreen.jsx";
 
@@ -47,6 +48,10 @@ import HodPloCourseMappingScreen from "./screens/hod/HodPloCourseMappingScreen.j
 import HodCoursesScreen from "./screens/hod/HodCoursesScreen.jsx";
 import HodCourseProgressScreen from "./screens/hod/HodCourseProgressScreen.jsx";
 import HodWeeklyStatusScreen from "./screens/hod/HodWeeklyStatusScreen.jsx";
+import HodAllocationScreen from "./screens/hod/HodAllocationScreen.jsx";
+import HodSubmittedFoldersScreen from "./screens/hod/HodSubmittedFoldersScreen.jsx";
+import HodSubmittedFolderDetailScreen from "./screens/hod/HodSubmittedFolderDetailScreen.jsx";
+import HodSubmittedFolderFilesScreen from "./screens/hod/HodSubmittedFolderFilesScreen.jsx";
 
 export const normalizeRole = (user) => {
   const rawRoleId =
@@ -133,6 +138,7 @@ const App = () => {
       >
         <Route index element={<TeacherHomeScreen />} />
         <Route path="profile" element={<TeacherProfileScreen />} />
+        <Route path="notifications" element={<TeacherNotificationsScreen />} />
         <Route path="submit-folders" element={<TeacherSubmitFoldersScreen />} />
         <Route
           path="course/:offeredCourseId/menu"
@@ -215,6 +221,13 @@ const App = () => {
         <Route path="program/:programId/mapping/peo-plo" element={<HodPeoPloMappingScreen />} />
         <Route path="program/:programId/mapping/plo-course" element={<HodPloCourseMappingScreen />} />
         <Route path="graders" element={<HodGradersScreen />} />
+        <Route path="allocation" element={<HodAllocationScreen />} />
+        <Route path="submitted-folders" element={<HodSubmittedFoldersScreen />} />
+        <Route path="submitted-folders/:offeredCourseId" element={<HodSubmittedFolderDetailScreen />} />
+        <Route
+          path="submitted-folders/:offeredCourseId/folder/:directoryId"
+          element={<HodSubmittedFolderFilesScreen />}
+        />
         <Route path="profile" element={<ProfileScreen />} />
       </Route>
 

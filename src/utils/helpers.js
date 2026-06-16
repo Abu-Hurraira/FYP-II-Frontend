@@ -24,3 +24,29 @@ export function getAuthRoleId(user) {
   const id = user?.roleId ?? user?.RoleId ?? user?.role?.roleId ?? user?.role?.RoleId;
   return id != null && id !== "" ? Number(id) : null;
 }
+
+/** Display teacher · course · section with spacing (avoids HamzaAppliedPhysicsBAI5A). */
+export function formatSubmittedFolderLabel(overview) {
+  const teacher = String(overview?.teacherName ?? overview?.TeacherName ?? "").trim();
+  const course = String(overview?.courseTitle ?? overview?.CourseTitle ?? "").trim();
+  const section = String(overview?.sectionName ?? overview?.SectionName ?? "").trim();
+  const parts = [teacher, course, section].filter(Boolean);
+  if (parts.length >= 2) return parts.join(" · ");
+
+  const root = String(overview?.rootFolderName ?? overview?.RootFolderName ?? "").trim();
+  if (root) {
+    return root
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
+      .trim();
+  }
+
+  return parts[0] || "";
+}
+
+/** Remove template prefix like "a-" from "a-Course Objectives". */
+export function stripFolderTemplatePrefix(name) {
+  return String(name || "")
+    .replace(/^[a-z]-\s*/i, "")
+    .trim();
+}

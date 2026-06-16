@@ -1,21 +1,15 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getTeacherCourses } from "../../api/teacherApi";
+import { getTeacherCourses, enrichCoursesWithFolderReview } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
+import {
+  teacherFolderStatusBadgeClass,
+  teacherFolderSubmissionStatus,
+} from "../../utils/weeklyProgressHelpers";
 
 import subjectIconUrl from "../../../assets/SubjectIcon.png";
-
-function courseStatus(course) {
-  const locked =
-    course.isFolderLocked ??
-    course.isLocked ??
-    course.folderSubmitted ??
-    course.isSubmitted ??
-    false;
-  return locked ? "Submitted" : "In Progress";
-}
 
 export default function TeacherHomeScreen() {
   const { user } = useContext(AuthContext);
@@ -39,7 +33,8 @@ export default function TeacherHomeScreen() {
 
     try {
       const data = await getTeacherCourses(teacherUserId);
-      setCourses(data);
+      const enriched = await enrichCoursesWithFolderReview(data);
+      setCourses(enriched);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -77,8 +72,7 @@ export default function TeacherHomeScreen() {
           <div className="flex flex-col gap-2.5 pt-2">
             {courses.map((course) => {
               const pct = Math.round(course.weeklyProgressPercentage || 0);
-              const status = courseStatus(course);
-              const isSubmitted = status === "Submitted";
+              const status = teacherFolderSubmissionStatus(course);
 
               return (
                 <button
@@ -105,11 +99,7 @@ export default function TeacherHomeScreen() {
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span
-                        className={`rounded-lg px-3 py-1 text-xs font-bold ${
-                          isSubmitted
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-amber-100 text-amber-900"
-                        }`}
+                        className={`rounded-lg px-3 py-1 text-xs font-bold ${teacherFolderStatusBadgeClass(status)}`}
                       >
                         {status}
                       </span>

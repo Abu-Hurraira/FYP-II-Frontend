@@ -1,10 +1,14 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getTeacherSubmissionCourses } from "../../api/teacherApi";
+import { getTeacherSubmissionCourses, enrichCoursesWithFolderReview } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
 import theme from "../../styles/theme";
+import {
+  teacherFolderStatusBadgeClass,
+  teacherFolderSubmissionStatus,
+} from "../../utils/weeklyProgressHelpers";
 
 export default function TeacherSubmitFoldersScreen() {
   const { user } = useContext(AuthContext);
@@ -25,7 +29,8 @@ export default function TeacherSubmitFoldersScreen() {
 
     try {
       const result = await getTeacherSubmissionCourses(teacherUserId);
-      setCourses(result);
+      const enriched = await enrichCoursesWithFolderReview(result);
+      setCourses(enriched);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -57,7 +62,9 @@ export default function TeacherSubmitFoldersScreen() {
           </div>
         ) : (
           <div className="flex flex-col gap-2.5 pt-2">
-            {courses.map((item) => (
+            {courses.map((item) => {
+              const status = teacherFolderSubmissionStatus(item);
+              return (
               <button
                 key={item.offeredCourseId}
                 type="button"
@@ -72,13 +79,16 @@ export default function TeacherSubmitFoldersScreen() {
                   <p className="text-sm font-semibold text-gray-900">
                     {item.courseTitle} — {item.sectionName}
                   </p>
-                  {item.isLocked && (
-                    <p className="mt-0.5 text-xs font-semibold text-emerald-600">Submitted / Locked</p>
-                  )}
+                  <span
+                    className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${teacherFolderStatusBadgeClass(status)}`}
+                  >
+                    {status}
+                  </span>
                 </div>
                 <span className="shrink-0 text-xl text-gray-300">›</span>
               </button>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import request from "./apiClient";
 import { getOfferedCourses } from "./offeredCoursesApi";
-import { getWeeklyContent } from "./teacherApi";
+import { getCourseFolderOverview, getWeeklyContent } from "./teacherApi";
 import { computeWeeklyProgressFromWeeks, folderStatusLabel } from "../utils/weeklyProgressHelpers";
 
 function courseDedupeKey(course) {
@@ -54,7 +54,7 @@ export function deduplicateHodCourses(courses = []) {
 function normalizeDashboardCourse(raw) {
   if (!raw || typeof raw !== "object") return raw;
 
-  return {
+  const result = {
     offeredCourseId: raw.offeredCourseId ?? raw.OfferedCourseId,
     sectionId: raw.sectionId ?? raw.SectionId ?? null,
     courseId: raw.courseId ?? raw.CourseId ?? null,
@@ -73,7 +73,20 @@ function normalizeDashboardCourse(raw) {
     deviationTopics: raw.deviationTopics ?? raw.DeviationTopics ?? 0,
     hasWeeklyContent: raw.hasWeeklyContent ?? raw.HasWeeklyContent ?? false,
     progressLoading: raw.progressLoading ?? false,
-    folderStatus: raw.folderStatus ?? raw.FolderStatus ?? folderStatusLabel(raw),
+    folderStatus: raw.folderStatus ?? raw.FolderStatus ?? "",
+    isLocked:
+      raw.isLocked ??
+      raw.IsLocked ??
+      raw.isFolderLocked ??
+      raw.IsFolderLocked ??
+      false,
+    isFolderLocked:
+      raw.isFolderLocked ??
+      raw.IsFolderLocked ??
+      raw.isLocked ??
+      raw.IsLocked ??
+      false,
+    folderSubmitted: raw.folderSubmitted ?? raw.FolderSubmitted ?? false,
     isSubmitted:
       raw.isSubmitted ??
       raw.IsSubmitted ??
@@ -81,6 +94,9 @@ function normalizeDashboardCourse(raw) {
       raw.FolderSubmitted ??
       false,
   };
+
+  result.folderStatus = result.folderStatus || folderStatusLabel(result);
+  return result;
 }
 
 const EMPTY_PROGRESS = {
@@ -163,3 +179,73 @@ export async function getHodDashboardCourses() {
 }
 
 export const getHodDashboardCoursesWithFallback = getHodDashboardCourses;
+
+function folderReviewStatus(overview) {
+  return String(
+    overview?.hodReviewStatus ??
+      overview?.HodReviewStatus ??
+      overview?.reviewStatus ??
+      overview?.ReviewStatus ??
+      overview?.submissionReviewStatus ??
+      overview?.SubmissionReviewStatus ??
+      "Pending"
+  ).trim();
+}
+
+function isFolderLockedOverview(overview) {
+  return Boolean(
+    overview?.isLocked ??
+      overview?.IsLocked ??
+      String(overview?.folderStatus ?? overview?.FolderStatus ?? "").toLowerCase() === "submitted"
+  );
+}
+
+/** Offered courses whose folder has been submitted (pending or approved HOD review). */
+export async function getHodSubmittedFolders({ concurrency = 4 } = {}) {
+  const [dashboardList, offeredRaw] = await Promise.all([
+    getHodDashboardCoursesList().catch(() => []),
+    getOfferedCourses().catch(() => []),
+  ]);
+
+  const offeredList = (Array.isArray(offeredRaw) ? offeredRaw : []).map((c) =>
+    normalizeDashboardCourse({ ...c, progressLoading: false })
+  );
+
+  const list = deduplicateHodCourses([...dashboardList, ...offeredList]);
+  if (!list.length) return [];
+
+  const submitted = [];
+  let nextIndex = 0;
+
+  const runWorker = async () => {
+    while (nextIndex < list.length) {
+      const i = nextIndex;
+      nextIndex += 1;
+      const course = list[i];
+
+      try {
+        const overview = await getCourseFolderOverview(course.offeredCourseId);
+        const locked = isFolderLockedOverview(overview);
+        if (!locked || overview?.isCreated === false) continue;
+
+        const reviewStatus = folderReviewStatus(overview);
+
+        submitted.push({
+          ...course,
+          isLocked: true,
+          isFolderLocked: true,
+          folderStatus: "Submitted",
+          reviewStatus,
+          rootFolderName: overview?.rootFolderName ?? overview?.RootFolderName ?? "",
+        });
+      } catch {
+        // Skip courses without a folder record.
+      }
+    }
+  };
+
+  const workers = Math.min(concurrency, list.length);
+  await Promise.all(Array.from({ length: workers }, () => runWorker()));
+
+  return submitted.sort((a, b) => (a.offeredCourseId ?? 0) - (b.offeredCourseId ?? 0));
+}

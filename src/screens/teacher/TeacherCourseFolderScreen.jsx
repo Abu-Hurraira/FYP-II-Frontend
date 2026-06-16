@@ -10,6 +10,10 @@ import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import theme from "../../styles/theme";
+import { stripFolderTemplatePrefix } from "../../utils/helpers";
+import {
+  teacherFolderSubmissionStatus,
+} from "../../utils/weeklyProgressHelpers";
 
 export default function TeacherCourseFolderScreen() {
   const { user } = useContext(AuthContext);
@@ -94,6 +98,8 @@ export default function TeacherCourseFolderScreen() {
   }
 
   const showSubmit = overview?.isCreated && !overview?.isLocked;
+  const folderStatus = overview ? teacherFolderSubmissionStatus(overview) : "In Progress";
+  const rejectionReason = overview?.rejectionReason ?? overview?.RejectionReason ?? "";
 
   return (
     <div className="relative min-h-full bg-page">
@@ -127,9 +133,28 @@ export default function TeacherCourseFolderScreen() {
         </div>
       ) : (
         <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
-          {overview.isLocked && (
+          {folderStatus === "Submitted" && (
+            <div className="mb-4 rounded-xl bg-blue-100 p-4 text-center">
+              <p className="font-extrabold text-blue-900">Submitted — awaiting HOD review</p>
+              <p className="mt-1 text-sm text-blue-800">This folder is locked until the HOD approves or rejects it.</p>
+            </div>
+          )}
+
+          {folderStatus === "Approved" && (
             <div className="mb-4 rounded-xl bg-emerald-100 p-4 text-center">
-              <p className="font-extrabold text-emerald-800">This folder is submitted and locked.</p>
+              <p className="font-extrabold text-emerald-800">Approved by HOD</p>
+              <p className="mt-1 text-sm text-emerald-900">This folder is approved and locked.</p>
+            </div>
+          )}
+
+          {folderStatus === "Rejected" && (
+            <div className="mb-4 rounded-xl bg-red-100 p-4 text-center">
+              <p className="font-extrabold text-red-800">Rejected — please revise and resubmit</p>
+              {rejectionReason ? (
+                <p className="mt-2 text-sm text-red-900">{rejectionReason}</p>
+              ) : (
+                <p className="mt-1 text-sm text-red-800">Update your files and submit again when ready.</p>
+              )}
             </div>
           )}
 
@@ -137,7 +162,6 @@ export default function TeacherCourseFolderScreen() {
             <button
               key={folder.directoryId}
               type="button"
-              disabled={overview.isLocked}
               onClick={() =>
                 navigate("/teacher/folder-upload", {
                   state: {
@@ -145,13 +169,17 @@ export default function TeacherCourseFolderScreen() {
                     teacherUserId,
                     isLocked: overview.isLocked,
                     courseTitle: overview.courseTitle,
+                    folderSubmissionStatus: folderStatus,
+                    rejectionReason,
                   },
                 })
               }
-              className="mb-2.5 flex w-full min-h-[48px] items-center rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:bg-gray-50"
+              className="mb-2.5 flex w-full min-h-[48px] items-center rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900">{folder.directoryName}</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {stripFolderTemplatePrefix(folder.directoryName)}
+                </p>
                 <p className="mt-0.5 text-xs text-gray-500">{folder.fileCount} file(s)</p>
               </div>
               <span className="shrink-0 text-xl text-gray-300">›</span>
