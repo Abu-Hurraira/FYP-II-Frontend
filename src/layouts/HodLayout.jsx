@@ -1,10 +1,26 @@
 import React, { useContext } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext.jsx";
+import LoggedInUserBar from "../components/LoggedInUserBar.jsx";
+import { getAuthDisplayName, getAuthRoleLabel } from "../utils/helpers";
 
 const navItem =
   "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-brand-muted/80";
 const navActive = "bg-brand-light text-brand shadow-sm";
+
+function normalizePath(path) {
+  return String(path || "/").replace(/\/+$/, "") || "/";
+}
+
+function isExactPath(pathname, target) {
+  return normalizePath(pathname) === normalizePath(target);
+}
+
+function isPathOrChild(pathname, target) {
+  const current = normalizePath(pathname);
+  const base = normalizePath(target);
+  return current === base || current.startsWith(`${base}/`);
+}
 
 function SidebarIconGrid() {
   return (
@@ -95,9 +111,10 @@ function SidebarIconClipboard() {
 export default function HodLayout() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
-  const displayName = user?.fullName || user?.name || "HOD";
-  const roleLabel = user?.roleName || "HOD";
+  const displayName = getAuthDisplayName(user, "HOD");
+  const roleLabel = getAuthRoleLabel(user, "HOD");
 
   const handleLogout = async () => {
     await logout();
@@ -118,34 +135,52 @@ export default function HodLayout() {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-3 py-6">
-          <NavLink to="/hod" end className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+          <NavLink
+            to="/hod"
+            className={`${navItem} ${isExactPath(pathname, "/hod") ? navActive : ""}`}
+          >
             <SidebarIconGrid />
             Home
           </NavLink>
-          <NavLink to="/hod/courses" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+          <NavLink
+            to="/hod/courses"
+            className={`${navItem} ${isExactPath(pathname, "/hod/courses") ? navActive : ""}`}
+          >
             <SidebarIconBook />
             Courses
           </NavLink>
-          <NavLink to="/hod/programs" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+          <NavLink
+            to="/hod/programs"
+            className={`${navItem} ${isExactPath(pathname, "/hod/programs") ? navActive : ""}`}
+          >
             <SidebarIconAcademic />
             Programs
           </NavLink>
-          <NavLink to="/hod/graders" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+          <NavLink
+            to="/hod/graders"
+            className={`${navItem} ${isExactPath(pathname, "/hod/graders") ? navActive : ""}`}
+          >
             <SidebarIconUsers />
             Graders
           </NavLink>
-          <NavLink to="/hod/allocation" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+          <NavLink
+            to="/hod/allocation"
+            className={`${navItem} ${isExactPath(pathname, "/hod/allocation") ? navActive : ""}`}
+          >
             <SidebarIconClipboard />
             Allocation
           </NavLink>
           <NavLink
             to="/hod/submitted-folders"
-            className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}
+            className={`${navItem} ${isPathOrChild(pathname, "/hod/submitted-folders") ? navActive : ""}`}
           >
             <SidebarIconFolder />
             Submitted Folders
           </NavLink>
-          <NavLink to="/hod/profile" className={({ isActive }) => `${navItem} ${isActive ? navActive : ""}`}>
+          <NavLink
+            to="/hod/profile"
+            className={`${navItem} ${isExactPath(pathname, "/hod/profile") ? navActive : ""}`}
+          >
             <SidebarIconUser />
             Profile
           </NavLink>
@@ -175,6 +210,7 @@ export default function HodLayout() {
       </aside>
 
       <main className="min-h-screen w-full min-w-0 flex-1 overflow-auto">
+        <LoggedInUserBar roleFallback="HOD" />
         <Outlet />
       </main>
     </div>

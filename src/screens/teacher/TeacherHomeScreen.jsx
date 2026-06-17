@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getTeacherCourses, enrichCoursesWithFolderReview } from "../../api/teacherApi";
+import { enrichCoursesWithFolderReview, getAllTeacherCourses } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
@@ -8,6 +8,7 @@ import {
   teacherFolderStatusBadgeClass,
   teacherFolderSubmissionStatus,
 } from "../../utils/weeklyProgressHelpers";
+import { getAuthDisplayName } from "../../utils/helpers";
 
 import subjectIconUrl from "../../../assets/SubjectIcon.png";
 
@@ -32,7 +33,7 @@ export default function TeacherHomeScreen() {
     }
 
     try {
-      const data = await getTeacherCourses(teacherUserId);
+      const data = await getAllTeacherCourses(teacherUserId);
       const enriched = await enrichCoursesWithFolderReview(data);
       setCourses(enriched);
     } catch (error) {
@@ -46,8 +47,7 @@ export default function TeacherHomeScreen() {
     loadCourses();
   }, [loadCourses]);
 
-  const displayName =
-    courses[0]?.teacherName || user?.fullName || user?.name || "Teacher";
+  const displayName = getAuthDisplayName(user, "Teacher");
 
   return (
     <div className="min-h-full bg-page">

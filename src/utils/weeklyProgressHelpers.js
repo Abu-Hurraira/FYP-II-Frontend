@@ -70,6 +70,13 @@ export function isSubmittedFolder(course) {
 }
 
 export function folderReviewStatusFromRecord(record) {
+  const nested =
+    record?.folderSubmission ??
+    record?.FolderSubmission ??
+    record?.submission ??
+    record?.Submission ??
+    null;
+
   return String(
     record?.hodReviewStatus ??
       record?.HodReviewStatus ??
@@ -77,6 +84,12 @@ export function folderReviewStatusFromRecord(record) {
       record?.ReviewStatus ??
       record?.submissionReviewStatus ??
       record?.SubmissionReviewStatus ??
+      record?.submissionStatus ??
+      record?.SubmissionStatus ??
+      nested?.submissionStatus ??
+      nested?.SubmissionStatus ??
+      nested?.reviewStatus ??
+      nested?.ReviewStatus ??
       ""
   ).trim();
 }
@@ -91,9 +104,10 @@ export function isFolderLockedRecord(record) {
       false
   );
   const status = String(
-    record?.folderStatus ?? record?.FolderStatus ?? record?.submissionStatus ?? ""
+    record?.folderStatus ?? record?.FolderStatus ?? record?.submissionStatus ?? record?.SubmissionStatus ?? ""
   ).toLowerCase();
-  return locked || status === "submitted";
+  const review = folderReviewStatusFromRecord(record).toLowerCase();
+  return locked || status === "submitted" || status === "approved" || review === "approved";
 }
 
 /** Teacher-facing folder submission status for list badges and banners. */
@@ -116,4 +130,21 @@ export function teacherFolderStatusBadgeClass(status) {
     default:
       return "bg-amber-100 text-amber-900";
   }
+}
+
+/** Course folder is read-only while awaiting or after HOD approval. */
+export function isSubmitFolderLocked(status) {
+  return status === "Submitted" || status === "Approved";
+}
+
+/** Prefer the most restrictive status from multiple API/navigation sources. */
+export function resolveTeacherFolderStatus(...sources) {
+  const statuses = sources
+    .filter((source) => source != null && source !== "")
+    .map((source) => (typeof source === "string" ? source : teacherFolderSubmissionStatus(source)));
+
+  if (statuses.includes("Approved")) return "Approved";
+  if (statuses.includes("Submitted")) return "Submitted";
+  if (statuses.includes("Rejected")) return "Rejected";
+  return "In Progress";
 }

@@ -1,7 +1,6 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getTeacherSubmissionCourses, enrichCoursesWithFolderReview } from "../../api/teacherApi";
-import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
+import { enrichCoursesWithFolderReview, getAllTeacherCourses } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
@@ -10,8 +9,6 @@ import {
   teacherFolderStatusBadgeClass,
   teacherFolderSubmissionStatus,
 } from "../../utils/weeklyProgressHelpers";
-import { hasAnyFolderUploadPermission } from "../../utils/uploadAllocationHelpers";
-
 export default function TeacherSubmitFoldersScreen() {
   const { user } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
@@ -30,15 +27,9 @@ export default function TeacherSubmitFoldersScreen() {
     }
 
     try {
-      const [result, allocation] = await Promise.all([
-        getTeacherSubmissionCourses(teacherUserId),
-        getHodUploadAllocation(),
-      ]);
+      const result = await getAllTeacherCourses(teacherUserId);
       const enriched = await enrichCoursesWithFolderReview(result);
-      const allowed = enriched.filter((item) =>
-        hasAnyFolderUploadPermission(item.offeredCourseId, allocation)
-      );
-      setCourses(allowed);
+      setCourses(enriched);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -55,8 +46,12 @@ export default function TeacherSubmitFoldersScreen() {
       <div className="flex flex-wrap items-start gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
         <PageBackButton className="mt-0.5" />
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold text-gray-900">Folders</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Submit folders</h1>
           <p className="mt-0.5 text-xs text-gray-500">{user?.fullName || user?.name || "Teacher"}</p>
+          <p className="mt-2 text-sm text-gray-600">
+            Upload files to any of your sections. No HOD permission is required. A section locks only
+            after you submit it and HOD approves it.
+          </p>
         </div>
       </div>
 
@@ -78,7 +73,8 @@ export default function TeacherSubmitFoldersScreen() {
                 type="button"
                 onClick={() =>
                   navigate(
-                    `/teacher/course/${item.offeredCourseId}/folder?teacherUserId=${teacherUserId ?? ""}`
+                    `/teacher/course/${item.offeredCourseId}/folder?teacherUserId=${teacherUserId ?? ""}`,
+                    { state: { folderStatus: status } }
                   )
                 }
                 className="flex min-h-[48px] items-center rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
@@ -99,7 +95,7 @@ export default function TeacherSubmitFoldersScreen() {
             })}
             {courses.length === 0 && (
               <p className="py-16 text-center text-sm text-gray-500">
-                No folder upload access assigned. Contact your HOD from the Allocation tab.
+                No courses assigned to you yet.
               </p>
             )}
           </div>

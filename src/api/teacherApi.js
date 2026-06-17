@@ -79,6 +79,33 @@ export async function getTeacherCourses(teacherUserId) {
   return await request(`/TeacherDashboard/${teacherUserId}/courses`);
 }
 
+/** Merge dashboard + submission course lists so teachers see every assigned course. */
+export function mergeTeacherCourses(...lists) {
+  const byId = new Map();
+  for (const list of lists) {
+    for (const course of list || []) {
+      const id = course?.offeredCourseId ?? course?.OfferedCourseId;
+      if (id == null) continue;
+      byId.set(Number(id), { ...(byId.get(Number(id)) || {}), ...course });
+    }
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => String(a.courseTitle ?? "").localeCompare(String(b.courseTitle ?? "")) ||
+      String(a.sectionName ?? "").localeCompare(String(b.sectionName ?? ""), undefined, { numeric: true })
+  );
+}
+
+export async function getAllTeacherCourses(teacherUserId) {
+  const [dashboard, submission] = await Promise.all([
+    getTeacherCourses(teacherUserId).catch(() => []),
+    getTeacherSubmissionCourses(teacherUserId).catch(() => []),
+  ]);
+  return mergeTeacherCourses(
+    Array.isArray(dashboard) ? dashboard : [],
+    Array.isArray(submission) ? submission : []
+  );
+}
+
 export async function getCourseMenu(offeredCourseId) {
   return await request(`/TeacherDashboard/course-menu/${offeredCourseId}`);
 }
@@ -150,7 +177,11 @@ export async function enrichCoursesWithFolderReview(courses = [], { concurrency 
             overview.SubmissionReviewStatus ??
             overview.hodReviewStatus ??
             overview.HodReviewStatus ??
-            course.reviewStatus,
+            overview.submissionStatus ??
+            overview.SubmissionStatus ??
+            course.reviewStatus ??
+            course.submissionStatus ??
+            course.SubmissionStatus,
           rejectionReason:
             overview.rejectionReason ?? overview.RejectionReason ?? course.rejectionReason,
           folderStatus: overview.folderStatus ?? overview.FolderStatus ?? course.folderStatus,

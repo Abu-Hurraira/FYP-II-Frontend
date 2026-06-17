@@ -7,11 +7,9 @@ import {
   updateTopicProgress,
   uploadWeeklyContentFile,
 } from "../../api/teacherApi";
-import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import { showAlert } from "../../utils/dialogs";
-import { canAccessWeeklyContent } from "../../utils/uploadAllocationHelpers";
 
 /** Leaf topics use their own flag; parents are covered only when every nested sub-topic is covered. */
 function isTopicFullyCovered(topic) {
@@ -42,22 +40,15 @@ export default function WeeklyContentScreen() {
   const [subTopicContext, setSubTopicContext] = useState(null);
   const [subTopicTitle, setSubTopicTitle] = useState("");
   const [subTopicCloCodes, setSubTopicCloCodes] = useState("");
-  const [allocationChecked, setAllocationChecked] = useState(false);
-  const [canUploadClos, setCanUploadClos] = useState(true);
 
   const loadData = async () => {
     try {
-      const [result, allocation] = await Promise.all([
-        getWeeklyContent(offeredCourseId),
-        getHodUploadAllocation(),
-      ]);
+      const result = await getWeeklyContent(offeredCourseId);
       setData(result);
-      setCanUploadClos(canAccessWeeklyContent(offeredCourseId, allocation));
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
-      setAllocationChecked(true);
     }
   };
 
@@ -207,22 +198,6 @@ export default function WeeklyContentScreen() {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
-      </div>
-    );
-  }
-
-  if (allocationChecked && !canUploadClos) {
-    return (
-      <div className="min-h-full bg-page">
-        <div className="flex flex-wrap items-start gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-          <PageBackButton className="mt-0.5" />
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Weekly Content</h1>
-          </div>
-        </div>
-        <p className="px-4 py-16 text-center text-sm text-gray-500 sm:px-6">
-          CLO / weekly content upload is not allocated to you for this course. Contact your HOD.
-        </p>
       </div>
     );
   }

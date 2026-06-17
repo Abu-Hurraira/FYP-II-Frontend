@@ -188,6 +188,8 @@ function folderReviewStatus(overview) {
       overview?.ReviewStatus ??
       overview?.submissionReviewStatus ??
       overview?.SubmissionReviewStatus ??
+      overview?.submissionStatus ??
+      overview?.SubmissionStatus ??
       "Pending"
   ).trim();
 }

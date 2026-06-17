@@ -1,6 +1,8 @@
 import React, { useContext } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext.jsx";
+import LoggedInUserBar from "../components/LoggedInUserBar.jsx";
+import { getAuthDisplayName, getAuthRoleLabel } from "../utils/helpers";
 
 const navItem =
   "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-brand-muted/80";
@@ -57,8 +59,8 @@ export default function AdminLayout() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const displayName = user?.fullName || user?.name || "Admin";
-  const roleLabel = user?.roleName || "Administrator";
+  const displayName = getAuthDisplayName(user, "Admin");
+  const roleLabel = getAuthRoleLabel(user, "Administrator");
 
   const handleLogout = async () => {
     await logout();
@@ -133,6 +135,7 @@ export default function AdminLayout() {
         </div>
       </aside>
       <main className="min-h-screen w-full min-w-0 flex-1 overflow-auto">
+        <LoggedInUserBar roleFallback="Administrator" />
         <Outlet />
       </main>
     </div>

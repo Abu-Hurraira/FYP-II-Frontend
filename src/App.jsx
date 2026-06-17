@@ -48,8 +48,8 @@ import HodPloCourseMappingScreen from "./screens/hod/HodPloCourseMappingScreen.j
 import HodCoursesScreen from "./screens/hod/HodCoursesScreen.jsx";
 import HodCourseProgressScreen from "./screens/hod/HodCourseProgressScreen.jsx";
 import HodWeeklyStatusScreen from "./screens/hod/HodWeeklyStatusScreen.jsx";
-import HodAllocationScreen from "./screens/hod/HodAllocationScreen.jsx";
 import HodSubmittedFoldersScreen from "./screens/hod/HodSubmittedFoldersScreen.jsx";
+import HodAllocationScreen from "./screens/hod/HodAllocationScreen.jsx";
 import HodSubmittedFolderDetailScreen from "./screens/hod/HodSubmittedFolderDetailScreen.jsx";
 import HodSubmittedFolderFilesScreen from "./screens/hod/HodSubmittedFolderFilesScreen.jsx";
 

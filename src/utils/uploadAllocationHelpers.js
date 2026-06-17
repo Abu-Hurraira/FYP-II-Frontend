@@ -1,28 +1,30 @@
 import {
+  getTemplateAllocationType,
+  isSubmissionUploadFolder,
+  isTemplateFolderDirectory,
+} from "./helpers";
+import {
   canTeacherUpload,
   getAllocationForOfferedCourse,
 } from "./hodUploadAllocationStorage";
 
 export { canTeacherUpload, getAllocationForOfferedCourse };
 
-export function mapCategoryToAllocationType(category) {
-  const value = String(category || "").toLowerCase();
-  if (value.includes("mid exam") || value === "mid") return "mid";
-  if (value.includes("final exam") || value === "final") return "final";
-  return "folderTemplate";
+function canAccessTemplateFolder(offeredCourseId, directoryName, config) {
+  const type = getTemplateAllocationType(directoryName);
+  return canTeacherUpload(offeredCourseId, type, config);
 }
 
-export function filterCategoriesByAllocation(categories, offeredCourseId, config) {
-  const list = Array.isArray(categories) ? categories : [];
-  return list.filter((category) => {
-    const type = mapCategoryToAllocationType(category);
-    return canTeacherUpload(offeredCourseId, type, config);
-  });
-}
-
-export function hasAnyFolderUploadPermission(offeredCourseId, config) {
-  const alloc = getAllocationForOfferedCourse(offeredCourseId, config);
-  return Boolean(alloc.mid || alloc.final || alloc.folderTemplate);
+/** Whether this teacher can open/upload in this folder section. */
+export function canAccessFolderSection(offeredCourseId, folder, config) {
+  if (isSubmissionUploadFolder(folder)) {
+    return true;
+  }
+  const directoryName = folder?.directoryName ?? folder?.DirectoryName ?? "";
+  if (isTemplateFolderDirectory(directoryName)) {
+    return canAccessTemplateFolder(offeredCourseId, directoryName, config);
+  }
+  return true;
 }
 
 export function canAccessWeeklyContent(offeredCourseId, config) {

@@ -1,24 +1,17 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   createMasterFolder,
   getCourseFolderOverview,
   submitCourseFolder,
   validateCourseFolder,
 } from "../../api/teacherApi";
-import { getHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import theme from "../../styles/theme";
 import { stripFolderTemplatePrefix } from "../../utils/helpers";
-import {
-  teacherFolderSubmissionStatus,
-} from "../../utils/weeklyProgressHelpers";
-import {
-  canTeacherUpload,
-  hasAnyFolderUploadPermission,
-} from "../../utils/uploadAllocationHelpers";
+import { isSubmitFolderLocked, resolveTeacherFolderStatus } from "../../utils/weeklyProgressHelpers";
 
 export default function TeacherCourseFolderScreen() {
   const { user } = useContext(AuthContext);
@@ -30,18 +23,15 @@ export default function TeacherCourseFolderScreen() {
     routeT != null && routeT !== "" ? Number(routeT) || user?.userId : user?.userId;
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const knownStatus = location.state?.folderStatus ?? null;
   const [overview, setOverview] = useState(null);
-  const [allocation, setAllocation] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadOverview = useCallback(async () => {
     try {
-      const [result, allocationConfig] = await Promise.all([
-        getCourseFolderOverview(offeredCourseId),
-        getHodUploadAllocation(),
-      ]);
+      const result = await getCourseFolderOverview(offeredCourseId);
       setOverview(result);
-      setAllocation(allocationConfig);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -78,7 +68,7 @@ export default function TeacherCourseFolderScreen() {
       if (
         !(await showConfirm(
           "Submit Folder",
-          "Are you sure? After submission, this folder will be locked."
+          "Are you sure? After submission, this section's folders will be locked until HOD review."
         ))
       ) {
         return;
@@ -107,30 +97,10 @@ export default function TeacherCourseFolderScreen() {
     );
   }
 
-  const showSubmit =
-    overview?.isCreated &&
-    !overview?.isLocked &&
-    canTeacherUpload(offeredCourseId, "folderTemplate", allocation);
-  const folderStatus = overview ? teacherFolderSubmissionStatus(overview) : "In Progress";
+  const folderStatus = resolveTeacherFolderStatus(overview, knownStatus);
+  const courseReadOnly = isSubmitFolderLocked(folderStatus);
+  const showSubmit = overview?.isCreated && !courseReadOnly;
   const rejectionReason = overview?.rejectionReason ?? overview?.RejectionReason ?? "";
-  const canAccessFolders = hasAnyFolderUploadPermission(offeredCourseId, allocation);
-  const canCreateFolder = canTeacherUpload(offeredCourseId, "folderTemplate", allocation);
-
-  if (!loading && overview && allocation && !canAccessFolders) {
-    return (
-      <div className="min-h-full bg-page">
-        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-          <PageBackButton className="shrink-0" />
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-semibold text-gray-900">{overview.courseTitle || "Folder"}</h1>
-          </div>
-        </div>
-        <p className="px-4 py-16 text-center text-sm text-gray-500 sm:px-6">
-          You are not allocated folder uploads for this course. Contact your HOD.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-full bg-page">
@@ -154,33 +124,27 @@ export default function TeacherCourseFolderScreen() {
       {!overview?.isCreated ? (
         <div className="mx-4 mt-6 rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm sm:mx-6 lg:mx-8">
           <p className="text-gray-600">MasterFolder has not been created yet.</p>
-          {canCreateFolder ? (
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="mt-5 rounded-lg bg-brand px-6 py-3 font-extrabold text-white"
-            >
-              Create MasterFolder
-            </button>
-          ) : (
-            <p className="mt-4 text-sm text-gray-500">
-              Folder Template allocation is required to create the master folder.
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="mt-5 rounded-lg bg-brand px-6 py-3 font-extrabold text-white"
+          >
+            Create MasterFolder
+          </button>
         </div>
       ) : (
         <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
           {folderStatus === "Submitted" && (
             <div className="mb-4 rounded-xl bg-blue-100 p-4 text-center">
               <p className="font-extrabold text-blue-900">Submitted — awaiting HOD review</p>
-              <p className="mt-1 text-sm text-blue-800">This folder is locked until the HOD approves or rejects it.</p>
+              <p className="mt-1 text-sm text-blue-800">All folders are locked. You can view files only.</p>
             </div>
           )}
 
           {folderStatus === "Approved" && (
             <div className="mb-4 rounded-xl bg-emerald-100 p-4 text-center">
               <p className="font-extrabold text-emerald-800">Approved by HOD</p>
-              <p className="mt-1 text-sm text-emerald-900">This folder is approved and locked.</p>
+              <p className="mt-1 text-sm text-emerald-900">All folders are locked. You can view files only.</p>
             </div>
           )}
 
@@ -190,39 +154,46 @@ export default function TeacherCourseFolderScreen() {
               {rejectionReason ? (
                 <p className="mt-2 text-sm text-red-900">{rejectionReason}</p>
               ) : (
-                <p className="mt-1 text-sm text-red-800">Update your files and submit again when ready.</p>
+                <p className="mt-1 text-sm text-red-800">Update your files and submit again.</p>
               )}
             </div>
           )}
 
-          {overview.folders.map((folder) => (
-            <button
-              key={folder.directoryId}
-              type="button"
-              onClick={() =>
-                navigate("/teacher/folder-upload", {
-                  state: {
-                    folder,
-                    teacherUserId,
-                    offeredCourseId,
-                    isLocked: overview.isLocked,
-                    courseTitle: overview.courseTitle,
-                    folderSubmissionStatus: folderStatus,
-                    rejectionReason,
-                  },
-                })
-              }
-              className="mb-2.5 flex w-full min-h-[48px] items-center rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900">
-                  {stripFolderTemplatePrefix(folder.directoryName)}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-500">{folder.fileCount} file(s)</p>
-              </div>
-              <span className="shrink-0 text-xl text-gray-300">›</span>
-            </button>
-          ))}
+          {overview.folders.map((folder) => {
+            const folderLocked = courseReadOnly;
+
+            return (
+              <button
+                key={folder.directoryId}
+                type="button"
+                onClick={() =>
+                  navigate("/teacher/folder-upload", {
+                    state: {
+                      folder,
+                      teacherUserId,
+                      offeredCourseId,
+                      isLocked: folderLocked,
+                      courseTitle: overview.courseTitle,
+                      folderSubmissionStatus: folderStatus,
+                      rejectionReason,
+                    },
+                  })
+                }
+                className="mb-2.5 flex w-full min-h-[48px] items-center rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {stripFolderTemplatePrefix(folder.directoryName)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {folder.fileCount} file(s)
+                    {folderLocked ? " · Locked" : ""}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xl text-gray-300">›</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
