@@ -30,3 +30,9 @@ export function canAccessFolderSection(offeredCourseId, folder, config) {
 export function canAccessWeeklyContent(offeredCourseId, config) {
   return canTeacherUpload(offeredCourseId, "clos", config);
 }
+
+/** Whether this teacher may add/upload weekly content (CLO allocation). */
+export function canUploadWeeklyContentFromPermissions(permissions) {
+  if (!permissions) return false;
+  return Boolean(permissions.clos ?? permissions.Clos);
+}

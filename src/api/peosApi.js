@@ -1,8 +1,9 @@
 import request, { API_BASE_URL } from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
 
-export const getPEOsByProgram = async (programId) => {
-  return await request(`/PEOs/by-program/${programId}`);
+export const getPEOsByProgram = async (programId, { includeArchived = false } = {}) => {
+  const query = includeArchived ? "?includeArchived=true" : "";
+  return await request(`/PEOs/by-program/${programId}${query}`);
 };
 
 export const createPEO = async (peo) => {
@@ -12,16 +13,24 @@ export const createPEO = async (peo) => {
   });
 };
 
-export const updatePEO = async (peoId, peo) => {
-  return await request(`/PEOs/${peoId}`, {
+export const updatePEO = async (peoId, peo, { archiveId } = {}) => {
+  const path = archiveId != null ? `/PEOs/archive/${archiveId}` : `/PEOs/${peoId}`;
+  return await request(path, {
     method: "PUT",
     body: JSON.stringify(peo),
   });
 };
 
-export const deletePEO = async (peoId) => {
-  return await request(`/PEOs/${peoId}`, {
+export const deletePEO = async (peoId, { archiveId } = {}) => {
+  const path = archiveId != null ? `/PEOs/archive/${archiveId}` : `/PEOs/${peoId}`;
+  return await request(path, {
     method: "DELETE",
+  });
+};
+
+export const restorePEOsByProgram = async (programId) => {
+  return await request(`/PEOs/restore-by-program/${programId}`, {
+    method: "POST",
   });
 };
 

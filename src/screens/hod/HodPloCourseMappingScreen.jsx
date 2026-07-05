@@ -86,7 +86,7 @@ export default function HodPloCourseMappingScreen() {
         setPlos(orderedPlos);
         setMatrix(loadPloCourseMapping(program.programId, orderedPlos));
       } catch (error) {
-        showAlert("Error", error.message);
+        if (mounted) showAlert("Error", error.message);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -213,8 +213,8 @@ export default function HodPloCourseMappingScreen() {
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
         <p className="mb-3 text-xs text-gray-500">
-          Only PLOs added for this program are shown. Split contribution % across courses in each column
-          — each used PLO must total <strong>100%</strong> (top row).
+          Only PLOs added for this program are shown. Restored PLOs from the PLO screen appear here automatically.
+          Split contribution % across courses in each column — each used PLO must total <strong>100%</strong> (top row).
         </p>
 
         {loading ? (

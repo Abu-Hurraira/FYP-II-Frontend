@@ -22,6 +22,26 @@ export async function getHodUploadAllocation() {
   }
 }
 
+/** Per-section upload flags for teacher UI (CLO weekly content uses `clos`). */
+export function normalizeOfferedCourseUploadPermissions(raw) {
+  if (!raw || typeof raw !== "object") {
+    return { clos: true, mid: true, final: true, folderTemplate: true, configured: false };
+  }
+  return {
+    offeredCourseId: raw.offeredCourseId ?? raw.OfferedCourseId,
+    configured: Boolean(raw.configured ?? raw.Configured),
+    clos: Boolean(raw.clos ?? raw.Clos),
+    mid: Boolean(raw.mid ?? raw.Mid),
+    final: Boolean(raw.final ?? raw.Final),
+    folderTemplate: Boolean(raw.folderTemplate ?? raw.FolderTemplate),
+  };
+}
+
+export async function getOfferedCourseUploadPermissions(offeredCourseId) {
+  const data = await request(`/HodUploadAllocation/offered-course/${offeredCourseId}`);
+  return normalizeOfferedCourseUploadPermissions(data);
+}
+
 export async function saveHodUploadAllocation(config) {
   const payload = {
     configured: Boolean(config?.configured),

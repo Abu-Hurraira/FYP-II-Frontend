@@ -5,6 +5,7 @@ import {
   deletePEO,
   getPEOsByProgram,
   importPEOs,
+  restorePEOsByProgram,
   updatePEO,
 } from "../../api/peosApi";
 
@@ -17,6 +18,7 @@ const PEOsScreen = () => {
       updateItem={updatePEO}
       deleteItem={deletePEO}
       importItems={importPEOs}
+      restoreAllByProgram={restorePEOsByProgram}
     />
   );
 };

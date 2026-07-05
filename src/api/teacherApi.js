@@ -1,6 +1,13 @@
 import request from "./apiClient";
 import { getOfferedCourses } from "./offeredCoursesApi";
 import { appendFormFile } from "../utils/appendFormFile";
+import {
+  findSameSubjectPeers,
+  normalizeWeeklyContent,
+  subjectKeyForCourse,
+  weeklyContentHasTopics,
+} from "../utils/weeklyContentSharing";
+import { computeWeeklyProgressFromWeeks } from "../utils/weeklyProgressHelpers";
 
 /** Safe parse for API booleans (1/0, "true"/"false", Newtonsoft quirks). */
 function parseJsonBool(value) {
@@ -120,6 +127,168 @@ export async function loadWeeklyContentFromDatabase(offeredCourseId) {
   });
 }
 
+/**
+ * Weekly content is uploaded per section but should be visible to every teacher
+ * teaching the same subject. Tries own section, DB sync, then sibling sections.
+ * Progress always comes from the requested section — never from a peer section.
+ */
+export async function getWeeklyContentShared(offeredCourseId) {
+  const ocId = Number(offeredCourseId);
+
+  const finalize = (data, extra = {}) =>
+    normalizeWeeklyContent({ ...data, offeredCourseId: ocId, ...extra });
+
+  let primary = null;
+  try {
+    primary = finalize(await getWeeklyContent(ocId));
+    if (weeklyContentHasTopics(primary)) {
+      return { ...primary, isSharedWeeklyContent: false };
+    }
+  } catch {
+    primary = null;
+  }
+
+  try {
+    const loaded = finalize(await loadWeeklyContentFromDatabase(ocId));
+    if (weeklyContentHasTopics(loaded)) {
+      return { ...loaded, isSharedWeeklyContent: false, loadedFromDatabase: true };
+    }
+  } catch {
+    // Continue to sibling sections.
+  }
+
+  let offeredList = [];
+  try {
+    const offered = await getOfferedCourses();
+    offeredList = Array.isArray(offered) ? offered : [];
+  } catch {
+    return primary ?? { weeks: [], offeredCourseId: ocId };
+  }
+
+  const peers = findSameSubjectPeers(offeredList, ocId);
+  for (const peer of peers) {
+    const peerId = peer.offeredCourseId ?? peer.OfferedCourseId;
+    if (peerId == null) continue;
+
+    let peerData = null;
+    try {
+      peerData = finalize(await getWeeklyContent(peerId));
+    } catch {
+      continue;
+    }
+    if (!weeklyContentHasTopics(peerData)) continue;
+
+    try {
+      const synced = finalize(await loadWeeklyContentFromDatabase(ocId));
+      if (weeklyContentHasTopics(synced)) {
+        const peerSection = peer.sectionName ?? peer.SectionName ?? peerData?.sectionName ?? "";
+        return {
+          ...synced,
+          isSharedWeeklyContent: true,
+          sharedFromOfferedCourseId: peerId,
+          sharedFromSectionName: peerSection,
+        };
+      }
+    } catch {
+      // Retry own section after server-side topic sync.
+    }
+
+    try {
+      const ownWithProgress = finalize(await getWeeklyContent(ocId));
+      if (weeklyContentHasTopics(ownWithProgress)) {
+        const peerSection = peer.sectionName ?? peer.SectionName ?? peerData?.sectionName ?? "";
+        return {
+          ...ownWithProgress,
+          isSharedWeeklyContent: true,
+          sharedFromOfferedCourseId: peerId,
+          sharedFromSectionName: peerSection,
+        };
+      }
+    } catch {
+      // No local topics could be synced for this section yet.
+    }
+  }
+
+  return primary ?? { weeks: [], offeredCourseId: ocId };
+}
+
+/** Mark hasWeeklyContent on all sections when any section of the same subject has content. */
+export async function enrichCoursesWithSharedWeeklyContent(courses = [], { concurrency = 4 } = {}) {
+  const list = Array.isArray(courses) ? courses.map((c) => ({ ...c })) : [];
+  if (!list.length) return list;
+
+  const groups = new Map();
+  for (const course of list) {
+    const key = subjectKeyForCourse(course);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(course);
+  }
+
+  const groupHasContent = new Map();
+  for (const [key, members] of groups) {
+    const anyHasFlag = members.some((c) => c.hasWeeklyContent ?? c.HasWeeklyContent);
+    if (anyHasFlag) {
+      groupHasContent.set(key, true);
+      continue;
+    }
+
+    const sampleId = members[0]?.offeredCourseId ?? members[0]?.OfferedCourseId ?? null;
+    if (sampleId == null) continue;
+
+    try {
+      const weekly = await getWeeklyContentShared(sampleId);
+      groupHasContent.set(key, weeklyContentHasTopics(weekly));
+    } catch {
+      groupHasContent.set(key, false);
+    }
+  }
+
+  let nextIndex = 0;
+
+  const runWorker = async () => {
+    while (nextIndex < list.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const course = list[index];
+      const key = subjectKeyForCourse(course);
+      if (!key || !groupHasContent.get(key)) continue;
+
+      const ocId = course.offeredCourseId ?? course.OfferedCourseId;
+      const hasBackendProgress =
+        course.weeklyProgressPercentage != null || course.WeeklyProgressPercentage != null;
+
+      const next = {
+        ...course,
+        hasWeeklyContent: true,
+        HasWeeklyContent: true,
+      };
+
+      if (!hasBackendProgress && ocId != null) {
+        try {
+          const weekly = await getWeeklyContentShared(ocId);
+          if (weeklyContentHasTopics(weekly)) {
+            const stats = computeWeeklyProgressFromWeeks(weekly.weeks ?? []);
+            next.weeklyProgressPercentage = stats.weeklyProgressPercentage;
+            next.coveredTopics = stats.coveredTopics;
+            next.totalTopics = stats.totalTopics;
+            next.deviationTopics = stats.deviationTopics;
+          }
+        } catch {
+          // Keep hasWeeklyContent flag without stats.
+        }
+      }
+
+      list[index] = next;
+    }
+  };
+
+  const workers = Math.min(concurrency, list.length || 1);
+  await Promise.all(Array.from({ length: workers }, () => runWorker()));
+
+  return list;
+}
+
 export async function addWeeklyTopic(offeredCourseId, payload) {
   return await request(`/TeacherWeeklyContent/${offeredCourseId}/topics`, {
     method: "POST",
@@ -128,10 +297,11 @@ export async function addWeeklyTopic(offeredCourseId, payload) {
 }
 
 export async function updateTopicProgress(offeredCourseId, topicId, teacherUserId, isCompleted) {
-  return await request(`/TeacherWeeklyContent/${offeredCourseId}/topics/${topicId}/complete`, {
+  const result = await request(`/TeacherWeeklyContent/${offeredCourseId}/topics/${topicId}/complete`, {
     method: "PUT",
     body: JSON.stringify({ teacherUserId, isCompleted }),
   });
+  return normalizeWeeklyContent({ ...result, offeredCourseId: Number(offeredCourseId) });
 }
 
 export async function uploadWeeklyContentFile(offeredCourseId, teacherUserId, file) {
@@ -260,34 +430,6 @@ function teacherFromOfferedCourse(peer) {
     sectionName: peer.sectionName ?? peer.SectionName ?? "",
     columnLabel: peer.columnLabel ?? peer.ColumnLabel ?? "",
   };
-}
-
-function findSameSubjectPeers(offeredList, offeredCourseId) {
-  const current = offeredList.find(
-    (oc) => Number(oc.offeredCourseId ?? oc.OfferedCourseId) === Number(offeredCourseId)
-  );
-  if (!current) return [];
-
-  const courseId = current.courseId ?? current.CourseId;
-  const courseTitle = String(current.courseTitle ?? current.CourseTitle ?? "")
-    .trim()
-    .toLowerCase();
-
-  return offeredList.filter((oc) => {
-    const ocId = Number(oc.offeredCourseId ?? oc.OfferedCourseId);
-    if (ocId === Number(offeredCourseId)) return false;
-    if (courseId != null && courseId !== "") {
-      return Number(oc.courseId ?? oc.CourseId) === Number(courseId);
-    }
-    if (courseTitle) {
-      return (
-        String(oc.courseTitle ?? oc.CourseTitle ?? "")
-          .trim()
-          .toLowerCase() === courseTitle
-      );
-    }
-    return false;
-  });
 }
 
 /** Merge sync data so Compare shows every section teaching the same subject (BAI + BCS, etc.). */

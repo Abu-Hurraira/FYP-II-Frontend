@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { enrichCoursesWithFolderReview, getAllTeacherCourses } from "../../api/teacherApi";
+import { enrichCoursesWithFolderReview, enrichCoursesWithSharedWeeklyContent, getAllTeacherCourses } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
@@ -35,7 +35,8 @@ export default function TeacherHomeScreen() {
     try {
       const data = await getAllTeacherCourses(teacherUserId);
       const enriched = await enrichCoursesWithFolderReview(data);
-      setCourses(enriched);
+      const withWeekly = await enrichCoursesWithSharedWeeklyContent(enriched);
+      setCourses(withWeekly);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {

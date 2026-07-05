@@ -1,6 +1,6 @@
 import request from "./apiClient";
 import { getOfferedCourses } from "./offeredCoursesApi";
-import { getCourseFolderOverview, getWeeklyContent } from "./teacherApi";
+import { getCourseFolderOverview, getWeeklyContentShared } from "./teacherApi";
 import { computeWeeklyProgressFromWeeks, folderStatusLabel } from "../utils/weeklyProgressHelpers";
 
 function courseDedupeKey(course) {
@@ -108,7 +108,7 @@ const EMPTY_PROGRESS = {
   progressLoading: false,
 };
 
-/** Fast list — one API call, no per-course weekly content. */
+/** Fast list — one API call with progress and folder status from backend. */
 export async function getHodDashboardCoursesList() {
   try {
     const data = await request("/HodDashboard/courses");
@@ -123,10 +123,30 @@ export async function getHodDashboardCoursesList() {
   }
 }
 
+/** Submitted folders — single API call (no per-course folder overview scan). */
+export async function getHodSubmittedFolders() {
+  try {
+    const data = await request("/HodSubmission/submitted-folders");
+    const list = Array.isArray(data) ? data : data?.folders ?? data?.Folders ?? [];
+    return list.map((item) =>
+      normalizeDashboardCourse({
+        ...item,
+        progressLoading: false,
+        isLocked: true,
+        isFolderLocked: true,
+        folderStatus: item.folderStatus ?? item.FolderStatus ?? "Submitted",
+        reviewStatus: item.reviewStatus ?? item.ReviewStatus ?? "Pending",
+      })
+    );
+  } catch {
+    return getHodSubmittedFoldersLegacy();
+  }
+}
+
 /** Progress stats for a single offered course (full weekly content tree). */
 export async function getHodCourseProgressSummary(offeredCourseId) {
   try {
-    const weekly = await getWeeklyContent(offeredCourseId);
+    const weekly = await getWeeklyContentShared(offeredCourseId);
     const stats = computeWeeklyProgressFromWeeks(weekly?.weeks ?? []);
     return {
       ...stats,
@@ -202,8 +222,8 @@ function isFolderLockedOverview(overview) {
   );
 }
 
-/** Offered courses whose folder has been submitted (pending or approved HOD review). */
-export async function getHodSubmittedFolders({ concurrency = 4 } = {}) {
+/** @deprecated Slow N+1 scan — kept as fallback only. */
+async function getHodSubmittedFoldersLegacy({ concurrency = 4 } = {}) {
   const [dashboardList, offeredRaw] = await Promise.all([
     getHodDashboardCoursesList().catch(() => []),
     getOfferedCourses().catch(() => []),

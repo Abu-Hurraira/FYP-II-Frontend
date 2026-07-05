@@ -161,7 +161,8 @@ export default function HodPeoPloMappingScreen() {
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
         <p className="mb-3 text-xs text-gray-500">
-          Checkbox means “this PEO maps to this PLO” for the selected program.
+          Checkbox means “this PEO maps to this PLO” for the selected program. Restored PLOs/PEOs from the PLO or PEO
+          screens appear here automatically.
         </p>
 
         {loading ? (

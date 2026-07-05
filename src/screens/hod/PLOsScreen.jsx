@@ -5,6 +5,7 @@ import {
   deletePLO,
   getPLOsByProgram,
   importPLOs,
+  restorePLOsByProgram,
   updatePLO,
 } from "../../api/plosApi";
 
@@ -17,6 +18,7 @@ const PLOsScreen = () => {
       updateItem={updatePLO}
       deleteItem={deletePLO}
       importItems={importPLOs}
+      restoreAllByProgram={restorePLOsByProgram}
     />
   );
 };

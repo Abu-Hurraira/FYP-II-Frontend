@@ -7,6 +7,11 @@ import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import { sortPeos, sortPlos } from "../../utils/outcomeHelpers";
+import {
+  formatRestoreSummary,
+  getArchiveId,
+  isOldOutcome,
+} from "../../utils/outcomeArchivedView";
 
 const PLO_MAX_COUNT = 12;
 
@@ -38,6 +43,7 @@ const OutcomeScreen = ({
   updateItem,
   deleteItem,
   importItems,
+  restoreAllByProgram,
   programsPath = "/hod/programs",
 }) => {
   const { user } = useContext(AuthContext);
@@ -60,11 +66,11 @@ const OutcomeScreen = ({
   const isPLO = type === "PLO";
   const valid = program && String(program.programId) === String(programId);
 
-  const loadItems = async () => {
+  const loadItems = async ({ includeArchived = false } = {}) => {
     if (!valid) return;
     try {
       setLoading(true);
-      const data = await getItems(program.programId);
+      const data = await getItems(program.programId, { includeArchived });
       const list = data || [];
       setItems(isPLO ? sortPlos(list) : sortPeos(list));
     } catch (error) {
@@ -74,8 +80,35 @@ const OutcomeScreen = ({
     }
   };
 
+  const activeItems = items.filter(
+    (item) => String(item.outcomeStatus ?? item.OutcomeStatus ?? "New").toLowerCase() !== "old"
+  );
+
+  const handleLoadFromDatabase = async () => {
+    setActionModalVisible(false);
+    if (!restoreAllByProgram) {
+      showAlert("Error", "Restore is not configured for this screen.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await restoreAllByProgram(program.programId);
+      await loadItems({ includeArchived: false });
+      showAlert(
+        "Restored from database",
+        `${formatRestoreSummary(result, type)} Restored items are marked as Old and appear in mapping screens automatically.`
+      );
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    loadItems();
+    if (!valid) return;
+    loadItems({ includeArchived: false });
   }, [valid, programId]);
 
   if (!valid) {
@@ -116,22 +149,27 @@ const OutcomeScreen = ({
 
     try {
       if (editingItem) {
+        const archiveId = getArchiveId(editingItem);
+        const editingOld = isOldOutcome(editingItem);
+        const payload = isPLO
+          ? {
+              ploCode:
+                editingItem.ploCode ??
+                getNextOutcomeCode(
+                  activeItems.filter((i) => (isPLO ? i.ploId : i.peoId) !== (isPLO ? editingItem.ploId : editingItem.peoId)),
+                  "PLO"
+                ),
+              ploDescription: description.trim(),
+            }
+          : { peoCode: editingItem.peoCode, peoDescription: description.trim() };
+
         await updateItem(
           isPLO ? editingItem.ploId : editingItem.peoId,
-          isPLO
-            ? {
-                ploCode:
-                  editingItem.ploCode ??
-                  getNextOutcomeCode(
-                    items.filter((i) => i.ploId !== editingItem.ploId),
-                    "PLO"
-                  ),
-                ploDescription: description.trim(),
-              }
-            : { peoCode: editingItem.peoCode, peoDescription: description.trim() }
+          payload,
+          editingOld && archiveId ? { archiveId } : undefined
         );
       } else {
-        const nextCode = getNextOutcomeCode(items, type);
+        const nextCode = getNextOutcomeCode(activeItems, type);
         if (isPLO && !nextCode) {
           showAlert(
             "Validation Error",
@@ -165,9 +203,28 @@ const OutcomeScreen = ({
   };
 
   const handleDelete = async (item) => {
-    if (!(await showConfirm(`Delete ${type}`, `Are you sure you want to delete this ${type}?`))) return;
+    const isOld = isOldOutcome(item);
+    const archiveId = getArchiveId(item);
+    const itemId = isPLO ? item.ploId : item.peoId;
+
+    const confirmed = isOld
+      ? await showConfirm(
+          `Delete ${type} permanently`,
+          `This old ${type} will be removed completely from the database. This cannot be undone.`
+        )
+      : await showConfirm(
+          `Delete ${type}`,
+          `Move this ${type} to old versions? It will be hidden until you load from database.`
+        );
+
+    if (!confirmed) return;
+
     try {
-      await deleteItem(isPLO ? item.ploId : item.peoId);
+      if (isOld && archiveId) {
+        await deleteItem(itemId, { archiveId });
+      } else {
+        await deleteItem(itemId);
+      }
       await loadItems();
     } catch (error) {
       showAlert("Error", error.message);
@@ -203,7 +260,7 @@ const OutcomeScreen = ({
       setUploadModalVisible(false);
       setActionModalVisible(false);
       setSelectedFile(null);
-      await loadItems();
+      await loadItems({ includeArchived: false });
     } catch (error) {
       showAlert("Upload Error", error.message);
     } finally {
@@ -235,25 +292,46 @@ const OutcomeScreen = ({
             {items.map((item) => {
               const code = isPLO ? item.ploCode : item.peoCode;
               const desc = isPLO ? item.ploDescription : item.peoDescription;
+              const status = String(item.outcomeStatus ?? item.OutcomeStatus ?? "New");
+              const isOld = isOldOutcome(item);
+              const rowKey = isOld
+                ? `old-${item.archiveId ?? item.ArchiveId}-${code}`
+                : isPLO
+                  ? item.ploId
+                  : item.peoId;
               return (
-                <div key={isPLO ? item.ploId : item.peoId} className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div key={rowKey} className={`flex items-start gap-3 rounded-lg border p-4 shadow-sm ${isOld ? "border-amber-200 bg-amber-50/60" : "border-gray-200 bg-white"}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-snug text-gray-900">{desc}</p>
-                    {code ? (
-                      <span className="mt-2 inline-block rounded-full bg-lime-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
-                        {code}
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          isOld ? "bg-amber-200 text-amber-900" : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {isOld ? "Old" : "New"}
                       </span>
-                    ) : null}
+                      {code ? (
+                        <span className="inline-block rounded-full bg-lime-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                          {code}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm font-medium leading-snug text-gray-900">{desc}</p>
                   </div>
                   <ListRowActions
                     onEdit={() => openEditForm(item)}
                     onDelete={() => handleDelete(item)}
                     editLabel={`Edit ${type}`}
-                    deleteLabel={`Delete ${type}`}
+                    deleteLabel={isOld ? `Delete ${type} permanently` : `Delete ${type}`}
                   />
                 </div>
               );
             })}
+            {!items.length && (
+              <p className="py-10 text-center text-sm text-gray-500">
+                No {type}s yet. Add new ones or upload from file.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -279,10 +357,7 @@ const OutcomeScreen = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setActionModalVisible(false);
-                loadItems();
-              }}
+              onClick={handleLoadFromDatabase}
               className="mb-3 w-full rounded-lg py-3 font-black text-white"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >

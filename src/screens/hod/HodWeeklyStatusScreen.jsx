@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getWeeklyContent } from "../../api/teacherApi";
+import { getWeeklyContentShared } from "../../api/teacherApi";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
@@ -20,7 +20,7 @@ export default function HodWeeklyStatusScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const result = await getWeeklyContent(offeredCourseId);
+        const result = await getWeeklyContentShared(offeredCourseId);
         setData(result);
       } catch (error) {
         showAlert("Error", error.message);

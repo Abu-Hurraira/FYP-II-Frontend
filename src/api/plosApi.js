@@ -1,8 +1,9 @@
 import request, { API_BASE_URL } from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
 
-export const getPLOsByProgram = async (programId) => {
-  return await request(`/PLOs/by-program/${programId}`);
+export const getPLOsByProgram = async (programId, { includeArchived = false } = {}) => {
+  const query = includeArchived ? "?includeArchived=true" : "";
+  return await request(`/PLOs/by-program/${programId}${query}`);
 };
 
 export const createPLO = async (plo) => {
@@ -12,16 +13,24 @@ export const createPLO = async (plo) => {
   });
 };
 
-export const updatePLO = async (ploId, plo) => {
-  return await request(`/PLOs/${ploId}`, {
+export const updatePLO = async (ploId, plo, { archiveId } = {}) => {
+  const path = archiveId != null ? `/PLOs/archive/${archiveId}` : `/PLOs/${ploId}`;
+  return await request(path, {
     method: "PUT",
     body: JSON.stringify(plo),
   });
 };
 
-export const deletePLO = async (ploId) => {
-  return await request(`/PLOs/${ploId}`, {
+export const deletePLO = async (ploId, { archiveId } = {}) => {
+  const path = archiveId != null ? `/PLOs/archive/${archiveId}` : `/PLOs/${ploId}`;
+  return await request(path, {
     method: "DELETE",
+  });
+};
+
+export const restorePLOsByProgram = async (programId) => {
+  return await request(`/PLOs/restore-by-program/${programId}`, {
+    method: "POST",
   });
 };
 

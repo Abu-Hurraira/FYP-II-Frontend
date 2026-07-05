@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getOfferedCourseUploadPermissions } from "../../api/hodUploadAllocationApi";
 import {
   addWeeklyTopic,
-  getWeeklyContent,
+  getWeeklyContentShared,
   loadWeeklyContentFromDatabase,
   updateTopicProgress,
   uploadWeeklyContentFile,
@@ -10,6 +11,7 @@ import {
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import { showAlert } from "../../utils/dialogs";
+import { canUploadWeeklyContentFromPermissions } from "../../utils/uploadAllocationHelpers";
 
 /** Leaf topics use their own flag; parents are covered only when every nested sub-topic is covered. */
 function isTopicFullyCovered(topic) {
@@ -28,7 +30,9 @@ export default function WeeklyContentScreen() {
 
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [uploadPermissions, setUploadPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
+  const canUploadWeeklyContent = canUploadWeeklyContentFromPermissions(uploadPermissions);
   const [actionModal, setActionModal] = useState(false);
   const [addModal, setAddModal] = useState(false);
   const [uploadModal, setUploadModal] = useState(false);
@@ -43,8 +47,15 @@ export default function WeeklyContentScreen() {
 
   const loadData = async () => {
     try {
-      const result = await getWeeklyContent(offeredCourseId);
+      const [result, permissions] = await Promise.all([
+        getWeeklyContentShared(offeredCourseId),
+        getOfferedCourseUploadPermissions(offeredCourseId).catch(() => ({
+          clos: true,
+          configured: false,
+        })),
+      ]);
       setData(result);
+      setUploadPermissions(permissions);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -210,11 +221,15 @@ export default function WeeklyContentScreen() {
             <PageBackButton className="mt-0.5 shrink-0" />
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Weekly Content</h1>
-              <p className="mt-0.5 text-xs text-gray-500">Manage topics and progress</p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {canUploadWeeklyContent ? "Manage topics and progress" : "View topics and track your progress"}
+              </p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <AddHeaderButton label="Add Content" onClick={() => setActionModal(true)} />
+            {canUploadWeeklyContent && (
+              <AddHeaderButton label="Add Content" onClick={() => setActionModal(true)} />
+            )}
             <button
               type="button"
               onClick={() =>
@@ -229,11 +244,22 @@ export default function WeeklyContentScreen() {
       </div>
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
+        {data?.isSharedWeeklyContent && (
+          <div className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Weekly content outline is shared from{" "}
+            <span className="font-semibold">
+              {data.sharedFromSectionName || "another section"}
+            </span>{" "}
+            of the same subject. Your progress is tracked separately for your section.
+          </div>
+        )}
+
         {data?.weeks?.map((week, index) => (
           <TopicCard
             key={week.topicId}
             topic={week}
             index={index}
+            canUpload={canUploadWeeklyContent}
             onToggle={handleToggleTopic}
             onAddSubTopic={openSubTopicModal}
           />
@@ -241,13 +267,19 @@ export default function WeeklyContentScreen() {
         {data?.weeks?.length === 0 && (
           <div className="mt-16 text-center">
             <p className="text-gray-600">No weekly content uploaded yet.</p>
-            <button
-              type="button"
-              onClick={() => setActionModal(true)}
-              className="mt-4 rounded-lg bg-brand-dark px-5 py-3 font-bold text-white"
-            >
-              Add Weekly Content
-            </button>
+            {canUploadWeeklyContent ? (
+              <button
+                type="button"
+                onClick={() => setActionModal(true)}
+                className="mt-4 rounded-lg bg-brand-dark px-5 py-3 font-bold text-white"
+              >
+                Add Weekly Content
+              </button>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500">
+                Only the HOD-allocated teacher for this subject can upload weekly content.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -430,7 +462,7 @@ function ModalBackdrop({ children, onClose }) {
   );
 }
 
-function TopicCard({ topic, index, onToggle, onAddSubTopic }) {
+function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic }) {
   const [expanded, setExpanded] = useState(false);
 
   const fullyCovered = isTopicFullyCovered(topic);
@@ -469,15 +501,17 @@ function TopicCard({ topic, index, onToggle, onAddSubTopic }) {
         >
           Week #{String(topic.weekNo || "").padStart(2, "0")} — {topic.topicTitle}
         </button>
-        <button
-          type="button"
-          onClick={() => onAddSubTopic(topic.topicId, weekNo, topic.topicTitle)}
-          className="shrink-0 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-dark"
-          title="Add sub-topic under this week"
-          aria-label="Add sub-topic under this week"
-        >
-          Add sub-topic
-        </button>
+        {canUpload && (
+          <button
+            type="button"
+            onClick={() => onAddSubTopic(topic.topicId, weekNo, topic.topicTitle)}
+            className="shrink-0 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-dark"
+            title="Add sub-topic under this week"
+            aria-label="Add sub-topic under this week"
+          >
+            Add sub-topic
+          </button>
+        )}
         <button
           type="button"
           onClick={toggleWeekExpand}
@@ -505,13 +539,21 @@ function TopicCard({ topic, index, onToggle, onAddSubTopic }) {
                 topic={child}
                 level={0}
                 weekNo={weekNo}
+                canUpload={canUpload}
                 onToggle={onToggle}
                 onAddSubTopic={onAddSubTopic}
               />
             ))
           ) : (
             <p className="px-4 py-4 text-center text-sm text-gray-500">
-              No sub-topics yet. Use the <span className="font-bold text-brand-dark">Add sub-topic</span> button to add one.
+              {canUpload
+                ? (
+                    <>
+                      No sub-topics yet. Use the{" "}
+                      <span className="font-bold text-brand-dark">Add sub-topic</span> button to add one.
+                    </>
+                  )
+                : "No sub-topics for this week yet."}
             </p>
           )}
         </div>
@@ -526,7 +568,7 @@ function TopicCard({ topic, index, onToggle, onAddSubTopic }) {
   );
 }
 
-function TopicNode({ topic, level, weekNo, onToggle, onAddSubTopic }) {
+function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSubTopic }) {
   const [expanded, setExpanded] = useState(false);
   const hasChildren = (topic.children?.length ?? 0) > 0;
   const fullyCovered = isTopicFullyCovered(topic);
@@ -603,18 +645,20 @@ function TopicNode({ topic, level, weekNo, onToggle, onAddSubTopic }) {
           >
             {fullyCovered ? "✓" : ""}
           </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddSubTopic(topic.topicId, weekNo, topic.topicTitle);
-            }}
-            className="shrink-0 rounded-full bg-brand/90 px-2.5 py-1 text-[10px] font-semibold leading-tight text-white shadow-sm hover:bg-brand-dark sm:text-xs"
-            title="Add nested sub-topic"
-            aria-label="Add nested sub-topic"
-          >
-            Add
-          </button>
+          {canUpload && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddSubTopic(topic.topicId, weekNo, topic.topicTitle);
+              }}
+              className="shrink-0 rounded-full bg-brand/90 px-2.5 py-1 text-[10px] font-semibold leading-tight text-white shadow-sm hover:bg-brand-dark sm:text-xs"
+              title="Add nested sub-topic"
+              aria-label="Add nested sub-topic"
+            >
+              Add
+            </button>
+          )}
           {hasChildren ? (
             <button
               type="button"
@@ -640,6 +684,7 @@ function TopicNode({ topic, level, weekNo, onToggle, onAddSubTopic }) {
               topic={child}
               level={level + 1}
               weekNo={weekNo}
+              canUpload={canUpload}
               onToggle={onToggle}
               onAddSubTopic={onAddSubTopic}
             />
