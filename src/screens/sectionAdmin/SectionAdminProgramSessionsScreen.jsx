@@ -82,7 +82,7 @@ export default function SectionAdminProgramSessionsScreen() {
                     state: { session: s, program },
                   })
                 }
-                className="flex min-h-[48px] w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
+                className="flex min-h-[48px] w-full items-center justify-between rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
               >
                 <div className="min-w-0 flex-1 pr-3">
                   <p className="truncate text-sm font-semibold text-gray-900">{s.sessionTitle}</p>

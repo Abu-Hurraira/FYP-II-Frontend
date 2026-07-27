@@ -82,7 +82,7 @@ export default function HodProgramsScreen() {
                 onClick={() =>
                   navigate(`/hod/program/${item.programId}/menu`, { state: { program: item } })
                 }
-                className="flex min-h-[48px] w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
+                className="flex min-h-[48px] w-full items-center justify-between rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
               >
                 <span className="truncate text-sm font-semibold text-gray-900">{item.programName}</span>
                 <span className="shrink-0 text-xl text-gray-300">›</span>

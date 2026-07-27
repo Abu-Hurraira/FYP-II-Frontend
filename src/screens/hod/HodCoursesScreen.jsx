@@ -206,7 +206,7 @@ export default function HodCoursesScreen() {
             {courses.map((item) => (
               <div
                 key={item.courseId}
-                className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">{item.courseTitle}</p>
@@ -254,12 +254,12 @@ export default function HodCoursesScreen() {
               <button
                 type="button"
                 onClick={() => setUploadVisible(true)}
-                className="mb-4 rounded-full bg-lime-100 px-4 py-1 text-sm font-extrabold text-gray-800"
+                className="app-btn-primary app-btn-primary-block mb-3 w-full py-3 font-extrabold"
               >
                 Upload File
               </button>
             )}
-            <button type="button" onClick={handleSaveCourse} className="w-full rounded-lg py-3 font-extrabold text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" onClick={handleSaveCourse} className="app-btn-primary app-btn-primary-block w-full py-3 font-extrabold">
               {editingCourse ? "Update" : "Add"}
             </button>
           </div>
@@ -279,7 +279,7 @@ export default function HodCoursesScreen() {
               disabled={uploading}
               onClick={handleUploadExcel}
               className="mt-4 w-full rounded-lg py-3 font-extrabold text-white disabled:opacity-60"
-              style={{ backgroundColor: "#8FBD96" }}
+              style={{ backgroundColor: "#1a6b45" }}
             >
               {uploading ? "…" : "⬆ Upload"}
             </button>

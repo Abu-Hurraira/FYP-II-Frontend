@@ -1,0 +1,243 @@
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import {
+  approvePendingClos,
+  getPendingCloApprovals,
+  rejectPendingClos,
+} from "../../api/hodCloReviewApi";
+import { AuthContext } from "../../context/AuthContext.jsx";
+import theme from "../../styles/theme";
+import { showAlert, showConfirm } from "../../utils/dialogs";
+import { getAuthUserId } from "../../utils/helpers";
+
+export default function HodCloApprovalsScreen() {
+  const { user } = useContext(AuthContext);
+  const hodUserId = getAuthUserId(user);
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
+
+  const loadPending = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getPendingCloApprovals();
+      setGroups(data || []);
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPending();
+  }, [loadPending]);
+
+  const handleApprove = async (item) => {
+    if (!hodUserId) {
+      showAlert("Error", "HOD user not found.");
+      return;
+    }
+
+    if (
+      !(await showConfirm(
+        "Approve CLOs",
+        `Approve ${item.pendingCount} CLO(s) for ${item.courseTitle}? They will become visible to all teachers of this subject.`
+      ))
+    ) {
+      return;
+    }
+
+    try {
+      setActionId(item.programCourseId);
+      await approvePendingClos(item.programCourseId, hodUserId);
+      showAlert("Approved", "CLOs approved and shared with subject teachers.");
+      await loadPending();
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const openRejectDialog = (item) => {
+    setRejectTarget(item);
+    setRejectReason("");
+  };
+
+  const closeRejectDialog = () => {
+    setRejectTarget(null);
+    setRejectReason("");
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectTarget) return;
+    if (!hodUserId) {
+      showAlert("Error", "HOD user not found.");
+      return;
+    }
+    if (!rejectReason.trim()) {
+      showAlert("Validation", "Please enter a rejection reason for the teacher.");
+      return;
+    }
+
+    try {
+      setActionId(rejectTarget.programCourseId);
+      await rejectPendingClos(rejectTarget.programCourseId, hodUserId, rejectReason.trim());
+      showAlert("Rejected", "CLOs rejected. The teacher has been notified.");
+      closeRejectDialog();
+      await loadPending();
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  return (
+    <div className="min-h-full bg-page">
+      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
+        <h1 className="text-xl font-semibold text-gray-900">CLO Approvals</h1>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Opened from Notifications — review CLOs before sharing with the subject.
+        </p>
+      </div>
+
+      <div className="w-full px-4 pb-8 pt-4 sm:px-6 lg:px-8">
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div
+              className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-transparent"
+              style={{ borderTopColor: theme.colors.primary }}
+            />
+          </div>
+        ) : groups.length === 0 ? (
+          <p className="rounded-2xl border border-gray-100 bg-white px-4 py-10 text-center text-sm text-gray-500 shadow-sm">
+            No pending CLO uploads right now.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {groups.map((item) => {
+              const busy = actionId === item.programCourseId;
+              const expanded = expandedId === item.programCourseId;
+              return (
+                <div
+                  key={item.programCourseId}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5"
+                >
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-base font-semibold text-gray-900">{item.courseTitle}</h2>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+                          Pending · {item.pendingCount}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {[item.courseCode, item.programName].filter(Boolean).join(" · ")}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Uploaded by {item.submittedByName}
+                        {item.submittedAt
+                          ? ` · ${new Date(item.submittedAt).toLocaleString()}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40"
+                        onClick={() =>
+                          setExpandedId(expanded ? null : item.programCourseId)
+                        }
+                      >
+                        {expanded ? "Hide CLOs" : "View CLOs"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="app-btn-primary disabled:opacity-50"
+                        onClick={() => handleApprove(item)}
+                      >
+                        {busy ? "…" : "Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
+                        onClick={() => openRejectDialog(item)}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+
+                  {expanded ? (
+                    <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+                      {(item.clos || []).map((clo) => (
+                        <div
+                          key={clo.cloId}
+                          className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5"
+                        >
+                          <span className="mr-2 inline-block rounded-full bg-lime-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                            {clo.cloCode}
+                          </span>
+                          <span className="text-sm text-gray-800">{clo.cloDescription}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {rejectTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+          role="presentation"
+          onClick={closeRejectDialog}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-gray-900">Reject CLOs</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Tell the teacher why CLOs for {rejectTarget.courseTitle} were rejected.
+            </p>
+            <textarea
+              className="mt-4 min-h-[100px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm"
+              placeholder="Rejection reason"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
+                onClick={closeRejectDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white"
+                onClick={handleRejectSubmit}
+                disabled={actionId === rejectTarget.programCourseId}
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

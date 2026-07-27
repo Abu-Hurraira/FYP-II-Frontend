@@ -112,12 +112,30 @@ export default function HodPeoPloMappingScreen() {
     });
   };
 
+  const mappedCount = useMemo(
+    () =>
+      Object.values(matrix || {}).reduce(
+        (total, row) => total + Object.keys(row || {}).length,
+        0
+      ),
+    [matrix]
+  );
+
   const handleSave = () => {
     if (!valid) return;
+
+    if (mappedCount === 0) {
+      showAlert(
+        "Nothing to save",
+        "Select at least one checkbox to map a PEO to a PLO before saving."
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       savePeoPloMapping(program.programId, matrix);
-      showAlert("Saved", "PEO–PLO mapping saved successfully.");
+      showAlert("Saved", `PEO–PLO mapping saved successfully (${mappedCount} mapping${mappedCount === 1 ? "" : "s"}).`);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -153,7 +171,7 @@ export default function HodPeoPloMappingScreen() {
           type="button"
           disabled={saving || loading || sortedPeos.length === 0 || sortedPlos.length === 0}
           onClick={handleSave}
-          className="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+          className="app-btn-primary shrink-0 rounded-2xl px-4 py-2 text-sm shadow-sm disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -183,7 +201,7 @@ export default function HodPeoPloMappingScreen() {
             <p className="mt-2 text-sm text-gray-500">Add PLOs under Program → PLOs first.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
             <table className="min-w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
@@ -205,7 +223,7 @@ export default function HodPeoPloMappingScreen() {
               <tbody>
                 {sortedPlos.map((plo, ploIndex) => {
                   return (
-                    <tr key={plo.ploId} className="border-b border-gray-100 hover:bg-gray-50/80">
+                    <tr key={plo.ploId} className="border-b border-gray-100 hover:bg-brand-muted/40/80">
                       <td className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-3">
                         <p className="font-semibold text-gray-900">{ploDisplayLabel(plo, ploIndex)}</p>
                         {plo.ploCode ? <p className="text-xs text-gray-500">{plo.ploCode}</p> : null}

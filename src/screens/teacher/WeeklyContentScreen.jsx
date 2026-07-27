@@ -235,7 +235,7 @@ export default function WeeklyContentScreen() {
               onClick={() =>
                 navigate(`/teacher/course/${offeredCourseId}/sync?teacherUserId=${teacherUserId ?? ""}`)
               }
-              className="flex h-9 shrink-0 items-center rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+              className="app-btn-primary h-9 shrink-0 rounded-lg px-3 text-sm"
             >
               Compare
             </button>
@@ -271,7 +271,7 @@ export default function WeeklyContentScreen() {
               <button
                 type="button"
                 onClick={() => setActionModal(true)}
-                className="mt-4 rounded-lg bg-brand-dark px-5 py-3 font-bold text-white"
+                className="app-btn-primary mt-4 rounded-lg px-5 py-3 font-bold"
               >
                 Add Weekly Content
               </button>
@@ -295,7 +295,7 @@ export default function WeeklyContentScreen() {
             </div>
             <button
               type="button"
-              className="mb-3 w-full rounded-md bg-brand-dark py-3 font-bold text-white"
+              className="app-btn-primary app-btn-primary-block mb-3 rounded-md py-3 font-bold"
               onClick={() => {
                 setActionModal(false);
                 setUploadModal(true);
@@ -305,14 +305,14 @@ export default function WeeklyContentScreen() {
             </button>
             <button
               type="button"
-              className="mb-3 w-full rounded-md bg-brand-dark py-3 font-bold text-white"
+              className="app-btn-primary app-btn-primary-block mb-3 rounded-md py-3 font-bold"
               onClick={handleLoadFromDatabase}
             >
               Load from Database
             </button>
             <button
               type="button"
-              className="w-full rounded-md bg-brand-dark py-3 font-bold text-white"
+              className="app-btn-primary app-btn-primary-block rounded-md py-3 font-bold"
               onClick={() => {
                 setActionModal(false);
                 setAddModal(true);
@@ -361,7 +361,7 @@ export default function WeeklyContentScreen() {
             <button
               type="button"
               onClick={handleSaveTopic}
-              className="w-full rounded-md bg-brand-dark py-3 font-extrabold text-white"
+              className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold"
             >
               Save Topic
             </button>
@@ -411,7 +411,7 @@ export default function WeeklyContentScreen() {
             <button
               type="button"
               onClick={handleSaveSubTopic}
-              className="w-full rounded-md bg-brand-dark py-3 font-extrabold text-white"
+              className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold"
             >
               Save sub-topic
             </button>
@@ -462,18 +462,113 @@ function ModalBackdrop({ children, onClose }) {
   );
 }
 
+const WEEK_PALETTES = [
+  {
+    badgeBg: "bg-emerald-950/80 border-emerald-500/30 text-emerald-400",
+    visibleBadge: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+    btnStyle: "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10",
+    iconPath: "M12 11c0 3.5-3.5 6-3.5 6S5 14.5 5 11a7 7 0 1114 0c0 3.5-3.5 6-3.5 6S12 14.5 12 11z",
+  },
+  {
+    badgeBg: "bg-yellow-950/80 border-yellow-500/30 text-yellow-400",
+    visibleBadge: "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30",
+    btnStyle: "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10",
+    iconPath: "M8 7h8m0 0l-4-4m4 4l-4 4m0 6H8m0 0l4 4m-4-4l4-4",
+  },
+  {
+    badgeBg: "bg-amber-950/80 border-amber-500/30 text-amber-400",
+    visibleBadge: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
+    btnStyle: "border-amber-500/40 text-amber-400 hover:bg-amber-500/10",
+    iconPath: "M13 10V3L4 14h7v7l9-11h-7z",
+  },
+  {
+    badgeBg: "bg-purple-950/80 border-purple-500/30 text-purple-400",
+    visibleBadge: "bg-purple-500/15 text-purple-400 border border-purple-500/30",
+    btnStyle: "border-purple-500/40 text-purple-400 hover:bg-purple-500/10",
+    iconPath: "M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 110 14 7 7 0 010-14z",
+  },
+  {
+    badgeBg: "bg-blue-950/80 border-blue-500/30 text-blue-400",
+    visibleBadge: "bg-blue-500/15 text-blue-400 border border-blue-500/30",
+    btnStyle: "border-blue-500/40 text-blue-400 hover:bg-blue-500/10",
+    iconPath: "M13 10V3L4 14h7v7l9-11h-7z",
+  },
+  {
+    badgeBg: "bg-cyan-950/80 border-cyan-500/30 text-cyan-400",
+    badgeText: "text-cyan-400",
+    visibleBadge: "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30",
+    btnStyle: "border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10",
+    iconPath: "M9 3v2m6-2v2M9 19v2m6-2v2M3 9h2m-2 6h2m14-6h2m-2 6h2M7 7h10v10H7z",
+  },
+  {
+    badgeBg: "bg-pink-950/80 border-pink-500/30 text-pink-400",
+    visibleBadge: "bg-pink-500/15 text-pink-400 border border-pink-500/30",
+    btnStyle: "border-pink-500/40 text-pink-400 hover:bg-pink-500/10",
+    iconPath: "M3 12h3l2-6 4 12 3-9 2 5h4",
+  },
+  {
+    badgeBg: "bg-lime-950/80 border-lime-500/30 text-lime-400",
+    visibleBadge: "bg-lime-500/15 text-lime-400 border border-lime-500/30",
+    btnStyle: "border-lime-500/40 text-lime-400 hover:bg-lime-500/10",
+    iconPath: "M12 2.25c-5.3 0-8.25 4.5-8.25 10.5 0 2.25 1.5 4.5 3 6l2.25-2.25v-3h6v3l2.25 2.25c1.5-1.5 3-3.75 3-6 0-6-2.95-10.5-8.25-10.5z",
+  },
+];
+
+function getTopicCoverageDetails(topic) {
+  const children = topic.children ?? [];
+  if (children.length === 0) {
+    const isDone = Boolean(topic.isCompleted);
+    return {
+      status: isDone ? "complete" : "pending",
+      label: isDone ? "Complete" : "Not Complete",
+      doneCount: isDone ? 1 : 0,
+      totalCount: 1,
+    };
+  }
+
+  let doneCount = 0;
+  let totalCount = 0;
+
+  function countLeaves(t) {
+    const subs = t.children ?? [];
+    if (subs.length === 0) {
+      totalCount++;
+      if (t.isCompleted) doneCount++;
+    } else {
+      for (const s of subs) {
+        countLeaves(s);
+      }
+    }
+  }
+
+  countLeaves(topic);
+
+  let status = "pending";
+  let label = "Not Complete";
+
+  if (doneCount === totalCount && totalCount > 0) {
+    status = "complete";
+    label = "Complete";
+  } else if (doneCount > 0) {
+    status = "partial";
+    label = `Partial (${doneCount}/${totalCount})`;
+  } else {
+    status = "pending";
+    label = "Not Complete";
+  }
+
+  return { status, label, doneCount, totalCount };
+}
+
 function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic }) {
   const [expanded, setExpanded] = useState(false);
 
-  const fullyCovered = isTopicFullyCovered(topic);
-  const bg = fullyCovered
-    ? "bg-emerald-200"
-    : index <= 2
-      ? "bg-yellow-100"
-      : "bg-emerald-50";
-
-  const weekNo = topic.weekNo != null ? Number(topic.weekNo) : null;
+  const weekNo = topic.weekNo != null ? Number(topic.weekNo) : index + 1;
   const hasChildren = (topic.children?.length ?? 0) > 0;
+  const subTopicCount = topic.children?.length ?? 0;
+  const coverage = getTopicCoverageDetails(topic);
+
+  const palette = WEEK_PALETTES[index % WEEK_PALETTES.length];
 
   const toggleWeekExpand = () => {
     setExpanded((prev) => {
@@ -491,46 +586,97 @@ function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic })
   };
 
   return (
-    <div className={`mb-3 rounded-lg border border-emerald-100 p-4 ${bg}`}>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="min-w-0 flex-1 py-1 text-left text-sm font-semibold text-gray-900 hover:opacity-80"
-          onClick={toggleWeekExpand}
-          aria-expanded={expanded}
-        >
-          Week #{String(topic.weekNo || "").padStart(2, "0")} — {topic.topicTitle}
-        </button>
-        {canUpload && (
+    <div className="mb-3.5 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm transition-all dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:hover:border-[#274347]">
+      <div className="flex flex-wrap items-center justify-between gap-3.5">
+        {/* Left Badge: 01 + Icon */}
+        <div className={`flex h-12 w-24 shrink-0 items-center justify-between rounded-xl border px-3 shadow-xs ${palette.badgeBg}`}>
+          <span className="text-base font-extrabold tracking-tight">
+            {String(weekNo).padStart(2, "0")}
+          </span>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d={palette.iconPath} />
+          </svg>
+        </div>
+
+        {/* Middle Topic Title & Details */}
+        <div className="min-w-0 flex-1">
           <button
             type="button"
-            onClick={() => onAddSubTopic(topic.topicId, weekNo, topic.topicTitle)}
-            className="shrink-0 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-dark"
-            title="Add sub-topic under this week"
-            aria-label="Add sub-topic under this week"
+            onClick={toggleWeekExpand}
+            className="line-clamp-1 text-left text-sm font-bold text-gray-900 transition hover:text-emerald-500 dark:text-white dark:hover:text-emerald-400"
           >
-            Add sub-topic
+            Week #{String(weekNo).padStart(2, "0")} — {topic.topicTitle}
           </button>
-        )}
-        <button
-          type="button"
-          onClick={toggleWeekExpand}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-50 text-2xl text-gray-700 transition hover:bg-purple-100"
-          aria-expanded={expanded}
-          aria-label={expanded ? "Collapse week topics" : "Expand week topics"}
-        >
-          <span
-            className={`inline-block transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
-            aria-hidden
+          <div className="mt-1 flex flex-wrap items-center gap-3.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {subTopicCount} sub-topics
+            </span>
+            <span className="flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Last updated: 12 May 2024
+            </span>
+          </div>
+        </div>
+
+        {/* Right Status & Controls */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Coverage Ratio Badge (e.g. 2/4) */}
+          <div
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold border ${
+              coverage.status === "complete"
+                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                : coverage.status === "partial"
+                  ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                  : "bg-rose-500/20 text-rose-400 border-rose-500/40"
+            }`}
+            title={`${coverage.doneCount} of ${coverage.totalCount} completed`}
           >
-            ›
-          </span>
-        </button>
+            <span>{coverage.doneCount}/{coverage.totalCount}</span>
+          </div>
+
+          {/* Hidden sub-topics hint */}
+          {!expanded && subTopicCount > 0 && (
+            <div className="hidden text-right text-xs text-gray-500 dark:text-gray-400 lg:block">
+              <div>{subTopicCount} sub-topics hidden</div>
+              <div className="text-[10px] text-gray-400 dark:text-gray-500">Tap the week title or &gt; to expand</div>
+            </div>
+          )}
+
+          {/* Add Sub-topic Button */}
+          {canUpload && (
+            <button
+              type="button"
+              onClick={() => onAddSubTopic(topic.topicId, weekNo, topic.topicTitle)}
+              className={`flex items-center gap-1 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition ${palette.btnStyle}`}
+            >
+              <span>Add sub-topic</span>
+              <span className="text-xs">&gt;</span>
+            </button>
+          )}
+
+          {/* Chevron expand button */}
+          <button
+            type="button"
+            onClick={toggleWeekExpand}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+            aria-expanded={expanded}
+          >
+            <span className={`inline-block transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}>
+              &gt;
+            </span>
+          </button>
+        </div>
       </div>
+
       {expanded && (
         <div
           id={`week-children-${topic.topicId}`}
-          className="mt-3 scroll-mt-24 border border-emerald-200 bg-white/60"
+          className="mt-3.5 rounded-xl border border-gray-200 bg-gray-50/70 p-3 shadow-inner dark:border-[#1b2c2e] dark:bg-[#071113]"
         >
           {hasChildren ? (
             topic.children.map((child) => (
@@ -545,24 +691,18 @@ function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic })
               />
             ))
           ) : (
-            <p className="px-4 py-4 text-center text-sm text-gray-500">
-              {canUpload
-                ? (
-                    <>
-                      No sub-topics yet. Use the{" "}
-                      <span className="font-bold text-brand-dark">Add sub-topic</span> button to add one.
-                    </>
-                  )
-                : "No sub-topics for this week yet."}
+            <p className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              {canUpload ? (
+                <>
+                  No sub-topics yet. Use the{" "}
+                  <span className="font-bold text-emerald-500">Add sub-topic</span> button to add one.
+                </>
+              ) : (
+                "No sub-topics for this week yet."
+              )}
             </p>
           )}
         </div>
-      )}
-      {!expanded && hasChildren && (
-        <p className="mt-2 text-center text-xs font-semibold text-gray-500">
-          {topic.children.length} sub-topic{topic.children.length === 1 ? "" : "s"} hidden — tap the week title or ›
-          to expand
-        </p>
       )}
     </div>
   );
@@ -602,7 +742,7 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
   return (
     <div>
       <div
-        className="flex min-h-[68px] items-center gap-3 border-b border-gray-200 pr-2"
+        className="flex min-h-[68px] items-center gap-3 border-b border-gray-200 pr-2 dark:border-[#1b2c2e]"
         style={{ paddingLeft: pad }}
       >
         <button
@@ -613,7 +753,9 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
         >
           <span
             className={`flex h-6 w-6 items-center justify-center rounded border-2 ${
-              fullyCovered ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300"
+              fullyCovered
+                ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
+                : "border-gray-300 dark:border-gray-600"
             }`}
           >
             {fullyCovered ? "✓" : ""}
@@ -621,15 +763,15 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
         </button>
         <button
           type="button"
-          className={`min-w-0 flex-1 py-3 text-left text-sm font-semibold text-gray-900 ${
-            hasChildren ? "hover:text-brand-dark" : ""
+          className={`min-w-0 flex-1 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 ${
+            hasChildren ? "hover:text-emerald-600 dark:hover:text-emerald-400" : ""
           }`}
           onClick={onTitleClick}
           aria-expanded={hasChildren ? expanded : undefined}
         >
           {topic.topicTitle}
           {hasChildren && !expanded && (
-            <span className="ml-2 text-xs font-semibold text-gray-500">
+            <span className="ml-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
               ({topic.children.length} nested — tap to expand)
             </span>
           )}
@@ -639,7 +781,9 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
             type="button"
             onClick={() => onToggle(topic)}
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
-              fullyCovered ? "border-emerald-500 text-emerald-600" : "border-gray-300"
+              fullyCovered
+                ? "border-emerald-500 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400"
+                : "border-gray-300 dark:border-gray-600"
             }`}
             aria-label={fullyCovered ? "Mark incomplete" : "Mark complete"}
           >
@@ -652,7 +796,7 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
                 e.stopPropagation();
                 onAddSubTopic(topic.topicId, weekNo, topic.topicTitle);
               }}
-              className="shrink-0 rounded-full bg-brand/90 px-2.5 py-1 text-[10px] font-semibold leading-tight text-white shadow-sm hover:bg-brand-dark sm:text-xs"
+              className="app-btn-primary shrink-0 rounded-full px-2.5 py-1 text-[10px] leading-tight sm:text-xs"
               title="Add nested sub-topic"
               aria-label="Add nested sub-topic"
             >
@@ -663,7 +807,7 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
             <button
               type="button"
               onClick={toggleBranchExpand}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-purple-50 text-2xl text-gray-700 hover:bg-purple-100"
+              className="week-card__chevron flex h-11 w-11 items-center justify-center rounded-full text-2xl"
               aria-expanded={expanded}
               aria-label={expanded ? "Collapse nested topics" : "Expand nested topics"}
             >
@@ -677,7 +821,7 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
         </div>
       </div>
       {hasChildren && expanded && (
-        <div id={`topic-children-${topic.topicId}`} className="bg-white/40">
+        <div id={`topic-children-${topic.topicId}`} className="week-topic-panel">
           {topic.children.map((child) => (
             <TopicNode
               key={child.topicId}

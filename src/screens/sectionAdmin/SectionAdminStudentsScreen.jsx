@@ -224,37 +224,60 @@ Errors: ${result.errorCount || 0}${errorPreview}`
               const graderAllocation = findGraderAllocationForStudent(item, graders, allocations);
               const assignedTeacher = getAssignedTeacherName(graderAllocation);
               return (
-              <div
-                key={item.studentId}
-                className={`flex items-start gap-3 rounded-lg border p-4 shadow-sm ${
-                  nominatedGrader ? "border-green-300 bg-green-50" : "border-gray-200 bg-white"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900">{item.fullName}</p>
-                    {nominatedGrader ? (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
-                        Grader
-                      </span>
+                <div
+                  key={item.studentId}
+                  className="flex items-start gap-3 rounded-2xl border p-4 shadow-sm transition-all"
+                  style={
+                    nominatedGrader
+                      ? {
+                          backgroundColor: "var(--brand-muted)",
+                          borderColor: "var(--brand-soft)",
+                        }
+                      : {
+                          backgroundColor: "var(--surface)",
+                          borderColor: "var(--border)",
+                        }
+                  }
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold" style={{ color: "var(--text)" }}>
+                        {item.fullName}
+                      </p>
+                      {nominatedGrader ? (
+                        <span
+                          className="rounded-full px-2.5 py-0.5 text-xs font-extrabold"
+                          style={{
+                            backgroundColor: "var(--brand-dark)",
+                            color: "#ffffff",
+                          }}
+                        >
+                          Grader
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 text-xs font-semibold" style={{ color: "var(--text)" }}>
+                      {item.aridNo}
+                    </p>
+                    {item.email ? (
+                      <p className="mt-0.5 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                        {item.email}
+                      </p>
+                    ) : null}
+                    {nominatedGrader && assignedTeacher ? (
+                      <p className="mt-1.5 text-xs font-bold" style={{ color: "var(--brand)" }}>
+                        Assigned to teacher: {assignedTeacher}
+                      </p>
                     ) : null}
                   </div>
-                  <p className="mt-0.5 text-xs font-medium text-gray-600">{item.aridNo}</p>
-                  {item.email ? <p className="mt-0.5 text-xs text-gray-500">{item.email}</p> : null}
-                  {nominatedGrader && assignedTeacher ? (
-                    <p className="mt-1 text-xs font-semibold text-green-800">
-                      Assigned to teacher: {assignedTeacher}
-                    </p>
-                  ) : null}
+                  <ListRowActions
+                    onEdit={() => openEdit(item)}
+                    onDelete={() => removeStudent(item)}
+                    editLabel="Edit student"
+                    deleteLabel="Delete student"
+                  />
                 </div>
-                <ListRowActions
-                  onEdit={() => openEdit(item)}
-                  onDelete={() => removeStudent(item)}
-                  editLabel="Edit student"
-                  deleteLabel="Delete student"
-                />
-              </div>
-            );
+              );
             })}
             {students.length === 0 && (
               <p className="py-10 text-center text-gray-500">No students found.</p>

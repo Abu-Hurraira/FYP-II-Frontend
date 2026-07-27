@@ -100,14 +100,14 @@ export default function HodSessionDetailsScreen() {
               state: { program, session },
             })
           }
-          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand-muted/40"
+          className="rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand-muted/40"
         >
           Offered Courses
         </button>
         <button
           type="button"
           onClick={() => setSectionModalVisible(true)}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+          className="app-btn-primary rounded-2xl px-4 py-2 text-sm shadow-sm"
         >
           Add Section
         </button>
@@ -126,7 +126,7 @@ export default function HodSessionDetailsScreen() {
             {sections.map((item) => (
               <div
                 key={item.sectionId}
-                className="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                className="w-full rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm"
               >
                 <p className="text-sm font-semibold text-gray-900">{item.sectionName}</p>
                 <p className="mt-0.5 text-xs text-gray-500">{item.studentCount || 0} Students</p>

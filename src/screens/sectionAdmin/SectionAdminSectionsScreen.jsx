@@ -6,6 +6,19 @@ import { getSectionsBySession } from "../../api/sectionsApi";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
 
+/** Infer semester from names like BCS-1A / BSSE-2B when DB value is missing. */
+function resolveSemester(section) {
+  const raw = section?.semester ?? section?.Semester;
+  if (raw != null && raw !== "" && Number(raw) > 0) return Number(raw);
+
+  const name = String(section?.sectionName ?? section?.SectionName ?? "");
+  const dashed = name.match(/[-_](\d+)[A-Za-z]?\b/);
+  if (dashed) return Number(dashed[1]);
+  const trailing = name.match(/(\d+)[A-Za-z]$/);
+  if (trailing) return Number(trailing[1]);
+  return null;
+}
+
 const SectionAdminSectionsScreen = () => {
   const { user } = useContext(AuthContext);
   const { sessionId } = useParams();
@@ -78,11 +91,13 @@ const SectionAdminSectionsScreen = () => {
                     state: { section: item },
                   })
                 }
-                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
+                className="flex w-full items-center justify-between rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
               >
                 <div className="min-w-0 text-left">
                   <p className="truncate text-sm font-semibold text-gray-900">{item.sectionName}</p>
-                  <p className="mt-0.5 text-xs text-gray-600">Semester: {item.semester || "Not set"}</p>
+                  <p className="mt-0.5 text-xs text-gray-600">
+                    Semester: {resolveSemester(item) ?? "Not set"}
+                  </p>
                   <p className="mt-0.5 text-xs text-gray-500">
                     {item.studentCount ?? item.StudentCount ?? 0} Students
                   </p>

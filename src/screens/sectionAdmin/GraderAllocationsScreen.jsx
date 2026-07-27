@@ -16,6 +16,7 @@ import {
   getAssignedTeacherName,
   getGradersAssignedToTeacher,
   GRADER_IMPORT_SAMPLE_ROWS,
+  isGraderAssignedToTeacher,
   isGraderAssignedToTeacherUser,
   isGraderLinkedToRegisteredStudent,
   isStudentNominatedGrader,
@@ -179,7 +180,7 @@ const GraderAllocationsScreen = () => {
     return graders.filter(
       (grader) =>
         isGraderLinkedToRegisteredStudent(grader, registeredStudents) &&
-        !isGraderAssignedToTeacherUser(grader.userId, selectedTeacher.userId, allocations)
+        !isGraderAssignedToTeacher(grader.userId, allocations) // exclude graders already assigned to ANY teacher
     );
   }, [graders, allocations, selectedTeacher, registeredStudents]);
 
@@ -490,75 +491,274 @@ const GraderAllocationsScreen = () => {
     }
   };
 
-  return (
-    <div className="relative min-h-full bg-page">
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <PageBackButton />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold text-gray-900">Graders</h1>
-          <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "SectionAdmin"}</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={openAssignModal}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-          >
-            Assign to teacher
-          </button>
-          <button
-            type="button"
-            onClick={openManualGraderModal}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
-          >
-            Add grader (manual)
-          </button>
-          <button
-            type="button"
-            onClick={openGraderImportModal}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
-          >
-            Add grader (file)
-          </button>
-        </div>
-      </div>
+  const [listSearch, setListSearch] = useState("");
 
-      <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-transparent" style={{ borderTopColor: theme.colors.primary }} />
+  const filteredAllocations = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    if (!q) return allocations;
+    return allocations.filter(
+      (item) =>
+        String(item.teacherName ?? "").toLowerCase().includes(q) ||
+        String(item.teacherEmail ?? "").toLowerCase().includes(q) ||
+        String(item.graderName ?? "").toLowerCase().includes(q) ||
+        String(item.graderAridNo ?? "").toLowerCase().includes(q) ||
+        String(item.graderEmail ?? "").toLowerCase().includes(q)
+    );
+  }, [allocations, listSearch]);
+
+  /** Returns 1–2 capital initials from a full name */
+  function getInitials(name) {
+    const parts = String(name || "").trim().split(/\s+/);
+    if (parts.length === 0 || !parts[0]) return "?";
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  return (
+    <div className="min-h-full w-full bg-page p-4 sm:p-6 lg:p-8">
+      {/* ── Main Container Box (Full Width Across Page) ── */}
+      <div
+        className="w-full rounded-3xl border p-5 shadow-2xl sm:p-6"
+        style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
+      >
+        {/* Header Top Row */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center gap-3.5">
+            <PageBackButton />
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+              style={{ backgroundColor: "var(--brand-dark)" }}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm-4 7a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold" style={{ color: "var(--text)" }}>
+                All Graders
+              </h1>
+              <p className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                View and manage all registered graders in the system
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-2.5 pb-24 pt-2">
-            {allocations.map((item) => (
-              <div key={item.graderAllocationId} className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-900">{item.teacherName}</p>
-                  <p className="mt-0.5 text-xs font-medium text-gray-600">Teacher email: {item.teacherEmail}</p>
-                  <p className="mt-2 text-xs font-medium text-gray-600">Grader: {item.graderName}</p>
-                  <p className="text-xs text-gray-600">{item.graderEmail}</p>
-                  {item.graderAridNo ? <p className="text-xs text-gray-600">ARID: {item.graderAridNo}</p> : null}
+
+          {/* Right side Controls: Search bar + Filter icon */}
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex items-center gap-2 rounded-xl border px-3.5 py-2"
+              style={{ backgroundColor: "var(--surface-2)", borderColor: "var(--border)" }}
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "var(--text-muted)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+              <input
+                className="w-48 bg-transparent text-sm outline-none sm:w-72"
+                style={{ color: "var(--text)" }}
+                placeholder="Search graders..."
+                value={listSearch}
+                onChange={(e) => setListSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Filter button */}
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90"
+              style={{ backgroundColor: "var(--brand)" }}
+              title="Clear search"
+              onClick={() => setListSearch("")}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M8 12h8M11 20h2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Action buttons strip */}
+        <div className="flex flex-wrap items-center justify-end gap-2.5 pt-4">
+          <button type="button" onClick={openAssignModal} className="app-btn-primary rounded-xl px-4 py-2 text-xs font-bold shadow-sm">
+            + Assign to teacher
+          </button>
+          <button type="button" onClick={openManualGraderModal} className="app-btn-primary rounded-xl px-4 py-2 text-xs font-bold shadow-sm">
+            + Add grader (manual)
+          </button>
+          <button type="button" onClick={openGraderImportModal} className="app-btn-primary rounded-xl px-4 py-2 text-xs font-bold shadow-sm">
+            + Add grader (file)
+          </button>
+        </div>
+
+        {/* ── Cards List ── */}
+        <div className="mt-4">
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <div
+                className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-transparent"
+                style={{ borderTopColor: theme.colors.primary }}
+              />
+            </div>
+          ) : filteredAllocations.length === 0 ? (
+            <div
+              className="my-6 rounded-2xl border border-dashed px-6 py-14 text-center"
+              style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-2)" }}
+            >
+              <svg className="mx-auto mb-3 h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "var(--text-muted)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2h5M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+              </svg>
+              <p className="text-sm font-bold" style={{ color: "var(--text)" }}>
+                {listSearch ? "No graders match your search." : "No grader allocations found."}
+              </p>
+              {!listSearch && (
+                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  Use "Assign to teacher" to create grader allocations.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3 pb-4">
+              {filteredAllocations.map((item) => (
+                <div
+                  key={item.graderAllocationId}
+                  className="flex items-center justify-between gap-6 rounded-2xl border p-4 shadow-lg transition-all hover:bg-emerald-500/5"
+                  style={{
+                    backgroundColor: "var(--surface-2)",
+                    borderColor: "var(--border)",
+                    borderLeftColor: "var(--brand)",
+                    borderLeftWidth: "4px",
+                  }}
+                >
+                  {/* Avatar Icon */}
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+                    style={{ backgroundColor: "var(--brand-dark)" }}
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm-4 7a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+
+                  {/* Teacher name + role badge */}
+                  <div className="w-40 shrink-0">
+                    <p className="truncate text-sm font-bold" style={{ color: "var(--text)" }}>
+                      {item.teacherName}
+                    </p>
+                    <span
+                      className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                      style={{
+                        backgroundColor: "var(--brand-muted)",
+                        color: "var(--brand)",
+                        border: "1px solid var(--brand-soft)",
+                      }}
+                    >
+                      Teacher
+                    </span>
+                  </div>
+
+                  {/* Email Column */}
+                  <div className="hidden min-w-0 flex-1 sm:flex sm:items-center sm:gap-2.5">
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border"
+                      style={{ backgroundColor: "var(--brand-muted)", borderColor: "var(--brand-soft)", color: "var(--brand)" }}
+                    >
+                      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                        EMAIL
+                      </p>
+                      <p className="truncate text-xs font-semibold" style={{ color: "var(--text)" }}>
+                        {item.teacherEmail}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Grader Name Column */}
+                  <div className="hidden min-w-0 flex-1 sm:flex sm:items-center sm:gap-2.5">
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border"
+                      style={{ backgroundColor: "var(--brand-muted)", borderColor: "var(--brand-soft)", color: "var(--brand)" }}
+                    >
+                      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm-4 7a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                        GRADER
+                      </p>
+                      <p className="truncate text-xs font-semibold" style={{ color: "var(--text)" }}>
+                        {item.graderName}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ARID Number Column */}
+                  {item.graderAridNo ? (
+                    <div className="hidden min-w-0 flex-1 sm:flex sm:items-center sm:gap-2.5">
+                      <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border"
+                        style={{ backgroundColor: "var(--brand-muted)", borderColor: "var(--brand-soft)", color: "var(--brand)" }}
+                      >
+                        <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-5m-4 0V5a2 2 0 0 1 4 0v1m-4 0h4" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                          ARID NUMBER
+                        </p>
+                        <p className="truncate text-xs font-semibold" style={{ color: "var(--text)" }}>
+                          {item.graderAridNo}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="hidden flex-1 sm:block" />
+                  )}
+
+                  {/* Mobile Compact Details */}
+                  <div className="min-w-0 flex-1 sm:hidden">
+                    <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>{item.teacherEmail}</p>
+                    <p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--text)" }}>
+                      Grader: {item.graderName}
+                    </p>
+                    {item.graderAridNo && (
+                      <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>{item.graderAridNo}</p>
+                    )}
+                  </div>
+
+                  {/* Trash Delete Action */}
+                  <button
+                    type="button"
+                    onClick={() => removeAllocation(item)}
+                    className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                    title="Remove allocation"
+                  >
+                    <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
-                <ListRowActions onDelete={() => removeAllocation(item)} deleteLabel="Remove allocation" />
-              </div>
-            ))}
-            {allocations.length === 0 && (
-              <p className="py-10 text-center font-bold text-gray-500">No grader allocations found.</p>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {modalVisible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={closeAssignModal} role="presentation">
           <div
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl shadow-xl"
+            style={{ backgroundColor: "var(--surface)" }}
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <div className="border-b border-gray-100 px-6 py-4">
-              <h2 className="text-center text-lg font-semibold text-gray-900">Assign grader to teacher</h2>
-              <p className="mt-1 text-center text-xs text-gray-500">
+            <div className="border-b px-6 py-4" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-center text-lg font-semibold" style={{ color: "var(--text)" }}>Assign grader to teacher</h2>
+              <p className="mt-1 text-center text-xs" style={{ color: "var(--text-muted)" }}>
                 Select a teacher, then choose one or more graders not already assigned to them.
               </p>
               {assignRefreshing ? (
@@ -568,16 +768,20 @@ const GraderAllocationsScreen = () => {
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
               <div>
-                <label className="text-sm font-extrabold">Search teacher by email</label>
+                <label className="text-sm font-extrabold" style={{ color: "var(--text)" }}>Search teacher by email</label>
                 <input
-                  className="mt-1 w-full rounded-lg border bg-white px-3 py-2"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  style={{ backgroundColor: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
                   value={teacherSearch}
                   onChange={(e) => setTeacherSearch(e.target.value)}
                   placeholder="e.g. mohsin@biit.edu.pk"
                 />
-                <div className="mt-2 max-h-36 overflow-y-auto rounded-lg border border-gray-200">
+                <div
+                  className="mt-2 max-h-36 overflow-y-auto rounded-lg border"
+                  style={{ borderColor: "var(--border)" }}
+                >
                   {filteredTeachers.length === 0 ? (
-                    <p className="px-3 py-4 text-center text-xs text-gray-500">No teachers match your search.</p>
+                    <p className="px-3 py-4 text-center text-xs" style={{ color: "var(--text-muted)" }}>No teachers match your search.</p>
                   ) : (
                     filteredTeachers.map((item) => {
                       const selected = selectedTeacher?.userId === item.userId;
@@ -586,12 +790,16 @@ const GraderAllocationsScreen = () => {
                           key={String(item.userId)}
                           type="button"
                           onClick={() => selectTeacher(item)}
-                          className={`block w-full border-b border-gray-100 px-3 py-2.5 text-left last:border-b-0 ${
-                            selected ? "bg-green-50" : "hover:bg-gray-50"
-                          }`}
+                          className={`block w-full border-b px-3 py-2.5 text-left last:border-b-0`}
+                          style={{
+                            borderBottomColor: "var(--border)",
+                            backgroundColor: selected ? "var(--brand-muted)" : "transparent",
+                          }}
+                          onMouseEnter={(e) => { if (!selected) e.currentTarget.style.backgroundColor = "var(--surface-2)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = selected ? "var(--brand-muted)" : "transparent"; }}
                         >
-                          <span className="block text-sm font-semibold text-gray-900">{item.fullName}</span>
-                          <span className="text-xs text-gray-500">{item.email}</span>
+                          <span className="block text-sm font-semibold" style={{ color: "var(--text)" }}>{item.fullName}</span>
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{item.email}</span>
                         </button>
                       );
                     })
@@ -600,7 +808,7 @@ const GraderAllocationsScreen = () => {
               </div>
 
               <div>
-                <label className="text-sm font-extrabold">
+                <label className="text-sm font-extrabold" style={{ color: "var(--text)" }}>
                   Select graders
                   {selectedTeacher ? (
                     <span className="ml-1 font-normal text-gray-500">
@@ -613,24 +821,28 @@ const GraderAllocationsScreen = () => {
                   ) : null}
                 </label>
                 {!selectedTeacher ? (
-                  <p className="mt-2 rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">
+                  <p className="mt-2 rounded-lg border border-dashed px-3 py-4 text-center text-xs" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
                     Select a teacher above to choose graders.
                   </p>
                 ) : (
                   <>
                     <input
-                      className="mt-1 w-full rounded-lg border bg-white px-3 py-2"
+                      className="mt-1 w-full rounded-lg border px-3 py-2"
+                      style={{ backgroundColor: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
                       value={graderSearch}
                       onChange={(e) => setGraderSearch(e.target.value)}
                       placeholder="e.g. aliislam@gmail.com or 23-ARID-0123"
                     />
-                    <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200">
+                    <div
+                      className="mt-2 max-h-48 overflow-y-auto rounded-lg border"
+                      style={{ borderColor: "var(--border)" }}
+                    >
                       {graders.length === 0 ? (
                         <p className="px-3 py-4 text-center text-xs text-gray-500">
                           No student graders yet. Nominate students first using Add grader (manual) or (file).
                         </p>
                       ) : filteredGraders.length === 0 && filteredSelectableGraders.length === 0 ? (
-                        <p className="px-3 py-4 text-center text-xs text-gray-500">
+                        <p className="px-3 py-4 text-center text-xs" style={{ color: "var(--text-muted)" }}>
                           {selectableGradersForTeacher.length === 0
                             ? "All graders are already assigned to this teacher."
                             : "No graders match your search."}
@@ -644,7 +856,8 @@ const GraderAllocationsScreen = () => {
                             .map((item) => (
                               <div
                                 key={`assigned-${item.userId}`}
-                                className="flex items-start gap-3 border-b border-gray-100 bg-gray-50 px-3 py-2.5 last:border-b-0"
+                                className="flex items-start gap-3 border-b px-3 py-2.5 last:border-b-0"
+                                style={{ backgroundColor: "var(--surface-2)", borderBottomColor: "var(--border)" }}
                               >
                                 <input
                                   type="checkbox"
@@ -654,10 +867,10 @@ const GraderAllocationsScreen = () => {
                                   readOnly
                                 />
                                 <div className="min-w-0">
-                                  <span className="block text-sm font-semibold text-gray-500">{item.fullName}</span>
-                                  <span className="text-xs text-gray-400">{item.email}</span>
+                                  <span className="block text-sm font-semibold" style={{ color: "var(--text-muted)" }}>{item.fullName}</span>
+                                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{item.email}</span>
                                   {item.aridNo ? (
-                                    <span className="block text-xs text-gray-400">{item.aridNo}</span>
+                                    <span className="block text-xs" style={{ color: "var(--text-muted)" }}>{item.aridNo}</span>
                                   ) : null}
                                   <span className="mt-1 block text-xs font-medium text-brand">
                                     Already assigned to this teacher
@@ -682,7 +895,8 @@ const GraderAllocationsScreen = () => {
                               return (
                                 <div
                                   key={`other-${item.userId}`}
-                                  className="flex items-start gap-3 border-b border-gray-100 bg-gray-50 px-3 py-2.5 last:border-b-0"
+                                  className="flex items-start gap-3 border-b px-3 py-2.5 last:border-b-0"
+                                  style={{ backgroundColor: "var(--surface-2)", borderBottomColor: "var(--border)" }}
                                 >
                                   <input
                                     type="checkbox"
@@ -691,13 +905,13 @@ const GraderAllocationsScreen = () => {
                                     readOnly
                                   />
                                   <div className="min-w-0">
-                                    <span className="block text-sm font-semibold text-gray-500">{item.fullName}</span>
-                                    <span className="text-xs text-gray-400">{item.email}</span>
+                                    <span className="block text-sm font-semibold" style={{ color: "var(--text-muted)" }}>{item.fullName}</span>
+                                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>{item.email}</span>
                                     {item.aridNo ? (
-                                      <span className="block text-xs text-gray-400">{item.aridNo}</span>
+                                      <span className="block text-xs" style={{ color: "var(--text-muted)" }}>{item.aridNo}</span>
                                     ) : null}
-                                    <span className="mt-1 block text-xs font-medium text-amber-700">
-                                      Assigned to {getAssignedTeacherName(existingAllocation)}
+                                    <span className="mt-1 block text-xs font-semibold" style={{ color: "#f59e0b" }}>
+                                      Already assigned to {getAssignedTeacherName(existingAllocation)} — cannot reassign
                                     </span>
                                   </div>
                                 </div>
@@ -709,9 +923,13 @@ const GraderAllocationsScreen = () => {
                             return (
                               <label
                                 key={String(item.userId)}
-                                className={`flex cursor-pointer items-start gap-3 border-b border-gray-100 px-3 py-2.5 last:border-b-0 ${
-                                  checked ? "bg-green-50" : "hover:bg-gray-50"
-                                }`}
+                                className="flex cursor-pointer items-start gap-3 border-b px-3 py-2.5 last:border-b-0"
+                                style={{
+                                  borderBottomColor: "var(--border)",
+                                  backgroundColor: checked ? "var(--brand-muted)" : "transparent",
+                                }}
+                                onMouseEnter={(e) => { if (!checked) e.currentTarget.style.backgroundColor = "var(--surface-2)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = checked ? "var(--brand-muted)" : "transparent"; }}
                               >
                                 <input
                                   type="checkbox"
@@ -720,10 +938,10 @@ const GraderAllocationsScreen = () => {
                                   onChange={() => toggleGraderSelection(item)}
                                 />
                                 <div className="min-w-0">
-                                  <span className="block text-sm font-semibold text-gray-900">{item.fullName}</span>
-                                  <span className="text-xs text-gray-500">{item.email}</span>
+                                  <span className="block text-sm font-semibold" style={{ color: "var(--text)" }}>{item.fullName}</span>
+                                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{item.email}</span>
                                   {item.aridNo ? (
-                                    <span className="block text-xs text-gray-400">{item.aridNo}</span>
+                                    <span className="block text-xs" style={{ color: "var(--text-muted)" }}>{item.aridNo}</span>
                                   ) : null}
                                 </div>
                               </label>
@@ -737,7 +955,7 @@ const GraderAllocationsScreen = () => {
               </div>
             </div>
 
-            <div className="border-t border-gray-100 px-6 py-4">
+            <div className="border-t px-6 py-4" style={{ borderColor: "var(--border)" }}>
               <button
                 type="button"
                 disabled={
@@ -772,13 +990,14 @@ const GraderAllocationsScreen = () => {
           role="presentation"
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl shadow-xl"
+            style={{ backgroundColor: "var(--surface)" }}
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <div className="relative border-b border-gray-100 px-6 py-4">
-              <h2 className="text-center text-lg font-semibold text-gray-900">Nominate student as grader</h2>
-              <p className="mt-1 text-center text-sm text-gray-500">
+            <div className="relative border-b px-6 py-4" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-center text-lg font-semibold" style={{ color: "var(--text)" }}>Nominate student as grader</h2>
+              <p className="mt-1 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                 Select students from a program. Checked students are added to Users with the Grader role.
               </p>
               <button
@@ -790,10 +1009,11 @@ const GraderAllocationsScreen = () => {
               </button>
             </div>
 
-            <div className="space-y-3 border-b border-gray-100 px-6 py-4">
-              <label className="text-sm font-extrabold">Program</label>
+            <div className="space-y-3 border-b px-6 py-4" style={{ borderColor: "var(--border)" }}>
+              <label className="text-sm font-extrabold" style={{ color: "var(--text)" }}>Program</label>
               <select
-                className="w-full rounded-lg border bg-white px-3 py-2"
+                className="w-full rounded-lg border px-3 py-2"
+                style={{ backgroundColor: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
                 value={selectedProgramId}
                 onChange={(e) => setSelectedProgramId(e.target.value)}
               >
@@ -805,9 +1025,10 @@ const GraderAllocationsScreen = () => {
                 ))}
               </select>
 
-              <label className="text-sm font-extrabold">Search by ARID (XX-ARID-XXXX)</label>
+              <label className="text-sm font-extrabold" style={{ color: "var(--text)" }}>Search by ARID (XX-ARID-XXXX)</label>
               <input
-                className="w-full rounded-lg border bg-white px-3 py-2"
+                className="w-full rounded-lg border px-3 py-2"
+                style={{ backgroundColor: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
                 value={aridSearch}
                 onChange={(e) => setAridSearch(e.target.value)}
                 placeholder="e.g. 24-ARID-1234"
@@ -829,7 +1050,7 @@ const GraderAllocationsScreen = () => {
                 <p className="py-8 text-center text-sm text-gray-500">No students match your search.</p>
               ) : (
                 <ul className="space-y-2">
-                  {filteredStudents.map((student) => {
+                   {filteredStudents.map((student) => {
                     const nominated = isStudentNominatedGrader(student, graderAridSet);
                     const key = normalizeArid(student.aridNo);
                     const busy = addingStudentKey === key;
@@ -838,8 +1059,11 @@ const GraderAllocationsScreen = () => {
                       <li
                         key={`${student.studentId}-${key}`}
                         className={`flex items-start gap-3 rounded-lg border p-3 ${
-                          nominated ? "border-green-300 bg-green-50" : "border-gray-200 bg-white"
+                          nominated
+                            ? "border-green-300 dark-grader-nominated"
+                            : "border-gray-200 bg-white"
                         }`}
+                        style={nominated ? { backgroundColor: "var(--brand-muted)", borderColor: "var(--brand-soft)" } : {}}
                       >
                         <input
                           type="checkbox"
@@ -850,16 +1074,33 @@ const GraderAllocationsScreen = () => {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-900">{student.fullName}</p>
+                            <p
+                              className="text-sm font-semibold"
+                              style={{ color: "var(--text)" }}
+                            >
+                              {student.fullName}
+                            </p>
                             {nominated ? (
-                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                              <span
+                                className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                                style={{
+                                  backgroundColor: "var(--brand-dark)",
+                                  color: "#ffffff",
+                                }}
+                              >
                                 Grader
                               </span>
                             ) : null}
-                            {busy ? <span className="text-xs text-gray-500">Adding…</span> : null}
+                            {busy ? (
+                              <span style={{ color: "var(--text-muted)" }} className="text-xs">
+                                Adding…
+                              </span>
+                            ) : null}
                           </div>
-                          <p className="mt-0.5 text-xs font-medium text-gray-600">{student.aridNo}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="mt-0.5 text-xs font-medium" style={{ color: "var(--text)" }}>
+                            {student.aridNo}
+                          </p>
+                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                             {student.sectionName ? `Section: ${student.sectionName}` : null}
                             {student.email ? ` · ${student.email}` : null}
                           </p>

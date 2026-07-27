@@ -64,13 +64,14 @@ const OutcomeScreen = ({
   const [uploading, setUploading] = useState(false);
 
   const isPLO = type === "PLO";
-  const valid = program && String(program.programId) === String(programId);
+  const targetProgramId = Number(programId || program?.programId);
+  const valid = Boolean(targetProgramId && !isNaN(targetProgramId));
 
   const loadItems = async ({ includeArchived = false } = {}) => {
     if (!valid) return;
     try {
       setLoading(true);
-      const data = await getItems(program.programId, { includeArchived });
+      const data = await getItems(targetProgramId, { includeArchived });
       const list = data || [];
       setItems(isPLO ? sortPlos(list) : sortPeos(list));
     } catch (error) {
@@ -93,11 +94,11 @@ const OutcomeScreen = ({
 
     try {
       setLoading(true);
-      const result = await restoreAllByProgram(program.programId);
+      const result = await restoreAllByProgram(targetProgramId);
       await loadItems({ includeArchived: false });
       showAlert(
         "Restored from database",
-        `${formatRestoreSummary(result, type)} Restored items are marked as Old and appear in mapping screens automatically.`
+        `${formatRestoreSummary(result, type)} Default ${type}s loaded into database successfully.`
       );
     } catch (error) {
       showAlert("Error", error.message);
@@ -109,7 +110,7 @@ const OutcomeScreen = ({
   useEffect(() => {
     if (!valid) return;
     loadItems({ includeArchived: false });
-  }, [valid, programId]);
+  }, [valid, targetProgramId]);
 
   if (!valid) {
     return (

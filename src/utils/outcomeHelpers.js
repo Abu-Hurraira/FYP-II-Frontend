@@ -15,8 +15,8 @@ export function sortByOutcomeCode(items, codeField) {
     if (aHas && bHas && na !== nb) return na - nb;
     if (aHas !== bHas) return aHas ? -1 : 1;
 
-    const idA = Number(a.ploId ?? a.peoId ?? 0);
-    const idB = Number(b.ploId ?? b.peoId ?? 0);
+    const idA = Number(a.ploId ?? a.peoId ?? a.cloId ?? 0);
+    const idB = Number(b.ploId ?? b.peoId ?? b.cloId ?? 0);
     return idA - idB;
   });
 }
@@ -27,6 +27,10 @@ export function sortPlos(plos) {
 
 export function sortPeos(peos) {
   return sortByOutcomeCode(peos, "peoCode");
+}
+
+export function sortClos(clos) {
+  return sortByOutcomeCode(clos, "cloCode");
 }
 
 export function ploDisplayLabel(plo, fallbackIndex = 0) {

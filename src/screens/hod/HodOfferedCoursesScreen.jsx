@@ -245,7 +245,7 @@ Errors: ${result.errorCount || 0}${errorPreview}`
             {offeredCourses.map((item) => (
               <div
                 key={item.offeredCourseId}
-                className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">{item.sectionName}</p>
@@ -346,7 +346,7 @@ Errors: ${result.errorCount || 0}${errorPreview}`
                   }
                   type="button"
                   onClick={() => handlePickerSelect(item)}
-                  className="block w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50"
+                  className="block w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-brand-muted/40"
                 >
                   {getPickerLabel(item)}
                 </button>

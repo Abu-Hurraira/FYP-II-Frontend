@@ -1,6 +1,6 @@
 import request from "./apiClient";
 import { getOfferedCourses } from "./offeredCoursesApi";
-import { getCourseFolderOverview, getWeeklyContentShared } from "./teacherApi";
+import { getWeeklyContentShared } from "./teacherApi";
 import { computeWeeklyProgressFromWeeks, folderStatusLabel } from "../utils/weeklyProgressHelpers";
 
 function courseDedupeKey(course) {
@@ -108,39 +108,93 @@ const EMPTY_PROGRESS = {
   progressLoading: false,
 };
 
-/** Fast list — one API call with progress and folder status from backend. */
+/** Fast paginated list — progress computed server-side for the current page only. */
+export async function getHodDashboardCoursesPage({ page = 1, pageSize = 12, search = "" } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  if (search?.trim()) params.set("search", search.trim());
+
+  const data = await request(`/HodDashboard/courses?${params.toString()}`);
+  const itemsRaw = Array.isArray(data) ? data : data?.items ?? data?.Items ?? [];
+  const items = itemsRaw.map((c) => normalizeDashboardCourse({ ...c, progressLoading: false }));
+
+  return {
+    items: deduplicateHodCourses(items),
+    page: data?.page ?? data?.Page ?? page,
+    pageSize: data?.pageSize ?? data?.PageSize ?? pageSize,
+    totalCount: data?.totalCount ?? data?.TotalCount ?? items.length,
+    hasMore: Boolean(data?.hasMore ?? data?.HasMore ?? false),
+  };
+}
+
+/** @deprecated Prefer getHodDashboardCoursesPage — kept for callers that need a full list. */
 export async function getHodDashboardCoursesList() {
   try {
-    const data = await request("/HodDashboard/courses");
-    const list = Array.isArray(data) ? data : data?.courses ?? data?.Courses ?? [];
-    return list.map((c) => normalizeDashboardCourse({ ...c, progressLoading: false }));
+    const page = await getHodDashboardCoursesPage({ page: 1, pageSize: 48 });
+    return page.items;
   } catch {
-    const offered = await getOfferedCourses();
-    const list = Array.isArray(offered) ? offered : [];
-    return list.map((c) =>
-      normalizeDashboardCourse({ ...c, ...EMPTY_PROGRESS, progressLoading: true })
-    );
+    const fallback = await getOfferedCoursesFallbackPage({ page: 1, pageSize: 48 });
+    return fallback.items;
   }
 }
 
-/** Submitted folders — single API call (no per-course folder overview scan). */
-export async function getHodSubmittedFolders() {
-  try {
-    const data = await request("/HodSubmission/submitted-folders");
-    const list = Array.isArray(data) ? data : data?.folders ?? data?.Folders ?? [];
-    return list.map((item) =>
-      normalizeDashboardCourse({
-        ...item,
-        progressLoading: false,
-        isLocked: true,
-        isFolderLocked: true,
-        folderStatus: item.folderStatus ?? item.FolderStatus ?? "Submitted",
-        reviewStatus: item.reviewStatus ?? item.ReviewStatus ?? "Pending",
-      })
-    );
-  } catch {
-    return getHodSubmittedFoldersLegacy();
+/**
+ * Client-side paginated fallback when the dashboard API is unavailable.
+ * Still avoids loading progress for every course at once.
+ */
+export async function getOfferedCoursesFallbackPage({ page = 1, pageSize = 12, search = "" } = {}) {
+  const offered = await getOfferedCourses();
+  const list = (Array.isArray(offered) ? offered : []).map((c) =>
+    normalizeDashboardCourse({ ...c, ...EMPTY_PROGRESS, progressLoading: true })
+  );
+
+  const deduped = deduplicateHodCourses(list);
+  const q = search.trim().toLowerCase();
+  const filtered = !q
+    ? deduped
+    : deduped.filter((c) =>
+        [c.teacherName, c.sectionName, c.courseTitle, c.courseCode, c.programName]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+
+  const start = (Math.max(page, 1) - 1) * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+
+  return {
+    items,
+    page: Math.max(page, 1),
+    pageSize,
+    totalCount: filtered.length,
+    hasMore: start + pageSize < filtered.length,
+  };
+}
+
+/** Submitted folders — single API call. Never falls back to the N+1 scan (that hung the UI). */
+export async function getHodSubmittedFolders(hodUserId) {
+  if (hodUserId == null || hodUserId === "" || Number.isNaN(Number(hodUserId))) {
+    return [];
   }
+
+  const data = await request(`/HodDashboard/${hodUserId}/submitted-folders`);
+  const list = Array.isArray(data) ? data : data?.folders ?? data?.Folders ?? [];
+  return list.map((item) => ({
+    ...normalizeDashboardCourse({
+      ...item,
+      progressLoading: false,
+      isLocked: true,
+      isFolderLocked: true,
+      folderStatus: item.folderStatus ?? item.FolderStatus ?? "Submitted",
+    }),
+    reviewStatus: item.reviewStatus ?? item.ReviewStatus ?? "Pending",
+    overallProgressPercent:
+      item.overallProgressPercent ?? item.OverallProgressPercent ?? 0,
+    submittedAt: item.submittedAt ?? item.SubmittedAt ?? null,
+  }));
 }
 
 /** Progress stats for a single offered course (full weekly content tree). */
@@ -199,75 +253,3 @@ export async function getHodDashboardCourses() {
 }
 
 export const getHodDashboardCoursesWithFallback = getHodDashboardCourses;
-
-function folderReviewStatus(overview) {
-  return String(
-    overview?.hodReviewStatus ??
-      overview?.HodReviewStatus ??
-      overview?.reviewStatus ??
-      overview?.ReviewStatus ??
-      overview?.submissionReviewStatus ??
-      overview?.SubmissionReviewStatus ??
-      overview?.submissionStatus ??
-      overview?.SubmissionStatus ??
-      "Pending"
-  ).trim();
-}
-
-function isFolderLockedOverview(overview) {
-  return Boolean(
-    overview?.isLocked ??
-      overview?.IsLocked ??
-      String(overview?.folderStatus ?? overview?.FolderStatus ?? "").toLowerCase() === "submitted"
-  );
-}
-
-/** @deprecated Slow N+1 scan — kept as fallback only. */
-async function getHodSubmittedFoldersLegacy({ concurrency = 4 } = {}) {
-  const [dashboardList, offeredRaw] = await Promise.all([
-    getHodDashboardCoursesList().catch(() => []),
-    getOfferedCourses().catch(() => []),
-  ]);
-
-  const offeredList = (Array.isArray(offeredRaw) ? offeredRaw : []).map((c) =>
-    normalizeDashboardCourse({ ...c, progressLoading: false })
-  );
-
-  const list = deduplicateHodCourses([...dashboardList, ...offeredList]);
-  if (!list.length) return [];
-
-  const submitted = [];
-  let nextIndex = 0;
-
-  const runWorker = async () => {
-    while (nextIndex < list.length) {
-      const i = nextIndex;
-      nextIndex += 1;
-      const course = list[i];
-
-      try {
-        const overview = await getCourseFolderOverview(course.offeredCourseId);
-        const locked = isFolderLockedOverview(overview);
-        if (!locked || overview?.isCreated === false) continue;
-
-        const reviewStatus = folderReviewStatus(overview);
-
-        submitted.push({
-          ...course,
-          isLocked: true,
-          isFolderLocked: true,
-          folderStatus: "Submitted",
-          reviewStatus,
-          rootFolderName: overview?.rootFolderName ?? overview?.RootFolderName ?? "",
-        });
-      } catch {
-        // Skip courses without a folder record.
-      }
-    }
-  };
-
-  const workers = Math.min(concurrency, list.length);
-  await Promise.all(Array.from({ length: workers }, () => runWorker()));
-
-  return submitted.sort((a, b) => (a.offeredCourseId ?? 0) - (b.offeredCourseId ?? 0));
-}

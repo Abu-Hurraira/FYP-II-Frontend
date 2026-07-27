@@ -1,21 +1,87 @@
-import React, { useContext } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext.jsx";
-import { getAuthDisplayName, getAuthRoleLabel } from "../utils/helpers";
+import { getUserNotifications } from "../api/notificationsApi";
+import { getAuthDisplayName, getAuthUserId } from "../utils/helpers";
+import ThemeToggle from "./ThemeToggle.jsx";
 
-export default function LoggedInUserBar({ roleFallback = "User" }) {
+function BellIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Top bar: theme toggle, optional notifications bell, profile avatar.
+ */
+export default function LoggedInUserBar({
+  roleFallback = "User",
+  profilePath,
+  notificationsPath = null,
+}) {
   const { user } = useContext(AuthContext);
+  const location = useLocation();
   const displayName = getAuthDisplayName(user, roleFallback);
-  const roleLabel = getAuthRoleLabel(user, roleFallback);
+  const userId = getAuthUserId(user);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const loadUnread = useCallback(async () => {
+    if (!notificationsPath || !userId) {
+      setUnreadCount(0);
+      return;
+    }
+    try {
+      const data = await getUserNotifications(userId);
+      setUnreadCount((data || []).filter((n) => !n.isRead).length);
+    } catch {
+      // Bell badge is best-effort; avoid toast spam if API is briefly unavailable.
+      setUnreadCount(0);
+    }
+  }, [notificationsPath, userId]);
+
+  useEffect(() => {
+    loadUnread();
+  }, [loadUnread, location.pathname]);
+
+  const initial = displayName.charAt(0).toUpperCase() || "U";
 
   return (
-    <div className="sticky top-0 z-20 flex items-center justify-end gap-2 border-b border-gray-200 bg-white/95 px-4 py-2.5 backdrop-blur sm:px-6 lg:px-8">
-      <div className="text-right">
-        <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-        <p className="text-xs text-gray-500">{roleLabel}</p>
-      </div>
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
-        {displayName.charAt(0).toUpperCase() || "U"}
-      </div>
+    <div className="app-header-bar">
+      <ThemeToggle />
+
+      {notificationsPath ? (
+        <Link
+          to={notificationsPath}
+          className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#1a6b45] transition hover:bg-brand-muted"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+          title="Notifications"
+        >
+          <BellIcon />
+          {unreadCount > 0 ? (
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+          ) : null}
+        </Link>
+      ) : null}
+
+      {profilePath ? (
+        <Link
+          to={profilePath}
+          className="app-header-avatar transition hover:bg-brand-muted"
+          aria-label="Profile"
+          title="Profile"
+        >
+          {initial}
+        </Link>
+      ) : (
+        <div className="app-header-avatar">{initial}</div>
+      )}
     </div>
   );
 }

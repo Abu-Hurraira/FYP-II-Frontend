@@ -114,7 +114,16 @@ export async function getAllTeacherCourses(teacherUserId) {
 }
 
 export async function getCourseMenu(offeredCourseId) {
-  return await request(`/TeacherDashboard/course-menu/${offeredCourseId}`);
+  const raw = await request(`/TeacherDashboard/course-menu/${offeredCourseId}`);
+  return {
+    offeredCourseId: raw.offeredCourseId ?? raw.OfferedCourseId,
+    courseId: raw.courseId ?? raw.CourseId,
+    programCourseId: raw.programCourseId ?? raw.ProgramCourseId,
+    courseTitle: raw.courseTitle ?? raw.CourseTitle ?? "",
+    courseCode: raw.courseCode ?? raw.CourseCode ?? "",
+    sectionName: raw.sectionName ?? raw.SectionName ?? "",
+    teacherName: raw.teacherName ?? raw.TeacherName ?? "",
+  };
 }
 
 export async function getWeeklyContent(offeredCourseId) {

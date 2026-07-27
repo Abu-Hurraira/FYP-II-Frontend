@@ -108,7 +108,7 @@ export default function HodSessionsScreen() {
                     state: { program: effectiveProgram, session: item },
                   })
                 }
-                className="w-full rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:bg-gray-50"
+                className="w-full rounded-2xl border border-gray-100 bg-white shadow-card p-4 text-left shadow-sm transition hover:bg-brand-muted/40"
               >
                 <p className="text-sm font-semibold text-gray-900">{item.sessionTitle}</p>
                 <p className="mt-0.5 text-xs text-gray-600">{item.academicYear}</p>

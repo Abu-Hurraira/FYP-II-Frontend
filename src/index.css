@@ -2,6 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --brand: #22c55e;
+  --brand-dark: #15803d;
+  --brand-accent: #4ade80;
+  --brand-light: #dcfce7;
+  --brand-muted: #f0fdf4;
+  --brand-soft: #bbf7d0;
+  --page: #f9fafb;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --border-subtle: #f3f4f6;
+  --sidebar: #1a6b45;
+  --sidebar-card: #228556;
+  --header-bg: rgba(255, 255, 255, 0.95);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --progress-track: #e5e7eb;
+  --welcome-banner: linear-gradient(105deg, #e8f6ee 0%, #e3f4eb 50%, #eaf7f0 100%);
+  --login-canvas: #f0f2f5;
+  --login-orb: #e4e9e6;
+  --login-mint: #c8e6d4;
+  /* Outlined buttons (light): visible border on white surfaces, green on hover */
+  --btn-fg: #14532d;
+  --btn-border: rgba(20, 83, 45, 0.45);
+  --btn-hover-bg: #1a6b45;
+  --btn-hover-border: #1a6b45;
+  --btn-hover-shadow: 0 8px 20px rgba(26, 107, 69, 0.32);
+  --btn-danger-fg: #dc2626;
+  color-scheme: light;
+}
+
+html.dark {
+  --brand: #2bd576;
+  --brand-dark: #168c50;
+  --brand-accent: #54ed98;
+  --brand-light: #123b29;
+  --brand-muted: #0d2b20;
+  --brand-soft: #1f6847;
+  --page: #071011;
+  --surface: #0d181a;
+  --surface-2: #122023;
+  --text: #f1f7f4;
+  --text-muted: #8fa5a0;
+  --border: #1b2c2e;
+  --border-subtle: #142326;
+  --sidebar: #071516;
+  --sidebar-card: #0d2921;
+  --header-bg: rgba(7, 16, 17, 0.94);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.025), 0 12px 30px rgba(0, 0, 0, 0.28);
+  --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.36);
+  --progress-track: #1a2c2e;
+  --welcome-banner:
+    radial-gradient(circle at 88% 30%, rgba(43, 213, 118, 0.18), transparent 30%),
+    linear-gradient(110deg, #0c3b2a 0%, #0a2c22 46%, #071719 100%);
+  --login-canvas: #071011;
+  --login-orb: #0a2020;
+  --login-mint: #0d3326;
+  /* Outlined buttons (dark): white border like sidebar tabs, green on hover */
+  --btn-fg: #ffffff;
+  --btn-border: rgba(255, 255, 255, 0.35);
+  --btn-hover-bg: #1a6b45;
+  --btn-hover-border: rgba(255, 255, 255, 0.55);
+  --btn-hover-shadow: 0 8px 22px rgba(26, 107, 69, 0.45);
+  --btn-danger-fg: #f87171;
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
@@ -9,5 +79,842 @@ body,
 }
 
 body {
-  @apply font-sans antialiased text-gray-900 bg-page;
+  @apply font-sans antialiased;
+  color: var(--text);
+  background-color: var(--page);
+}
+
+.app-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  width: 16rem;
+  flex-shrink: 0;
+  flex-direction: column;
+  overflow-y: auto;
+  color: #ffffff;
+  background-color: var(--sidebar);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Sidebar is out of flow when fixed — keep main content clear of it */
+.app-sidebar ~ main {
+  margin-left: 16rem;
+  width: calc(100% - 16rem);
+  max-width: calc(100% - 16rem);
+}
+
+.app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-sidebar-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1.25rem 0.75rem;
+}
+
+/* Sidebar links: white outline like Logout on hover / selected */
+.app-sidebar .app-sidebar-nav a.app-nav-item,
+.app-sidebar a.app-nav-item {
+  display: flex !important;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 1rem !important;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.app-sidebar .app-sidebar-nav a.app-nav-item:hover,
+.app-sidebar .app-sidebar-nav a.app-nav-item:focus,
+.app-sidebar .app-sidebar-nav a.app-nav-item:focus-visible,
+.app-sidebar a.app-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.app-sidebar .app-sidebar-nav a.app-nav-item.app-nav-active,
+.app-sidebar a.app-nav-item.app-nav-active,
+.app-sidebar a.app-nav-item.app-nav-active:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.app-sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  padding: 0.75rem;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.app-sidebar-avatar {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #ffffff;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.app-header-avatar {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1a6b45;
+  background-color: transparent;
+  border: 1.5px solid #1a6b45;
+  text-decoration: none;
+}
+
+html.dark .app-header-avatar {
+  color: #86efac;
+  border-color: #4ade80;
+}
+
+/* Mint welcome banner — same look on every role dashboard */
+.dashboard-welcome-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: var(--welcome-banner);
+  min-height: 8.5rem;
+}
+
+.dashboard-welcome-banner__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 1.35rem 1.75rem;
+}
+
+.dashboard-welcome-banner__art {
+  height: 9rem;
+  width: auto;
+  max-width: 22rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  object-position: right center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Dark art has a black plate — blend it out so only the folder/plant show on the green banner */
+html.dark .dashboard-welcome-banner__art--dark {
+  mix-blend-mode: lighten;
+  background: transparent !important;
+}
+
+html.dark .dashboard-welcome-banner__title {
+  color: #f0fdf4 !important;
+}
+
+html.dark .dashboard-welcome-banner__subtitle {
+  color: #bbf7d0 !important;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-welcome-banner {
+    min-height: 9.5rem;
+  }
+
+  .dashboard-welcome-banner__art {
+    height: 10.5rem;
+    max-width: 26rem;
+  }
+}
+
+.app-logout-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  padding: 0.625rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  transition: background-color 0.15s ease;
+}
+
+.app-logout-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.app-card {
+  border-radius: 1rem;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.app-card:hover {
+  border-color: var(--brand-soft);
+  background-color: var(--brand-muted);
+}
+
+.app-page {
+  min-height: 100%;
+  background-color: var(--page);
+}
+
+.app-header-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--header-bg);
+  backdrop-filter: blur(8px);
+}
+
+.app-progress-track {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: var(--progress-track);
+}
+
+.app-progress-fill {
+  height: 10px;
+  min-width: 0;
+  border-radius: 9999px;
+  background-color: var(--brand);
+  transition: width 0.3s ease;
+}
+
+/* Brand color fallbacks — always win over button preflight (transparent bg) */
+.bg-brand {
+  background-color: var(--brand) !important;
+}
+.bg-brand-accent {
+  background-color: var(--brand-accent) !important;
+}
+.bg-brand-dark {
+  background-color: var(--brand-dark) !important;
+}
+.bg-brand-light {
+  background-color: var(--brand-light) !important;
+}
+.bg-brand-muted {
+  background-color: var(--brand-muted) !important;
+}
+.bg-brand-soft {
+  background-color: var(--brand-soft) !important;
+}
+.bg-page {
+  background-color: var(--page) !important;
+}
+.bg-sidebar {
+  background-color: var(--sidebar) !important;
+}
+.bg-surface {
+  background-color: var(--surface) !important;
+}
+.text-brand {
+  color: var(--brand) !important;
+}
+.text-brand-dark {
+  color: var(--brand-dark) !important;
+}
+.text-brand-accent {
+  color: var(--brand-accent) !important;
+}
+.border-brand {
+  border-color: var(--brand) !important;
+}
+.border-brand-soft {
+  border-color: var(--brand-soft) !important;
+}
+.hover\:bg-brand:hover {
+  background-color: var(--brand) !important;
+}
+.hover\:bg-brand-accent:hover {
+  background-color: var(--brand-accent) !important;
+}
+.hover\:bg-brand-dark:hover {
+  background-color: var(--brand-dark) !important;
+}
+.hover\:bg-brand-muted:hover {
+  background-color: var(--brand-muted) !important;
+}
+.hover\:bg-brand-muted\/40:hover {
+  background-color: color-mix(in srgb, var(--brand-muted) 40%, transparent) !important;
+}
+.hover\:border-brand-soft:hover {
+  border-color: var(--brand-soft) !important;
+}
+.hover\:text-brand-dark:hover {
+  color: var(--brand-dark) !important;
+}
+
+/* Primary CTA buttons — outlined like sidebar tabs, green fill on hover */
+.app-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.app-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.app-btn-primary-block {
+  display: flex;
+  width: 100%;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dark theme remaps — flip common light Tailwind utilities across the app    */
+/* Skip .app-sidebar so green nav text/icons stay white                       */
+/* -------------------------------------------------------------------------- */
+
+html.dark body {
+  color: var(--text);
+  background:
+    radial-gradient(circle at 70% 0%, rgba(21, 94, 65, 0.09), transparent 30rem),
+    var(--page);
+}
+
+html.dark .app-sidebar {
+  background:
+    radial-gradient(circle at 25% 75%, rgba(43, 213, 118, 0.08), transparent 16rem),
+    var(--sidebar);
+  border-right: 1px solid var(--border-subtle);
+}
+
+html.dark .app-sidebar .app-sidebar-nav a.app-nav-item:hover,
+html.dark .app-sidebar .app-sidebar-nav a.app-nav-item:focus,
+html.dark .app-sidebar .app-sidebar-nav a.app-nav-item:focus-visible,
+html.dark .app-sidebar a.app-nav-item:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+}
+
+html.dark .app-sidebar .app-sidebar-nav a.app-nav-item.app-nav-active,
+html.dark .app-sidebar a.app-nav-item.app-nav-active,
+html.dark .app-sidebar a.app-nav-item.app-nav-active:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+}
+
+html.dark .bg-white {
+  background-color: var(--surface) !important;
+}
+
+html.dark .app-sidebar .bg-white,
+html.dark .bg-keep-white {
+  background-color: #ffffff !important;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-gray-100 {
+  background-color: var(--surface-2) !important;
+}
+
+html.dark .bg-\[\#f0f2f5\],
+html.dark .bg-\[\#e4e9e6\],
+html.dark .bg-\[\#f8fafc\] {
+  background-color: var(--surface) !important;
+}
+
+html.dark .bg-\[\#c8e6d4\] {
+  background-color: var(--login-mint) !important;
+}
+
+html.dark .text-gray-900,
+html.dark .text-gray-800 {
+  color: #f3f4f6 !important;
+}
+
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: #e5e7eb !important;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: #d1d5db !important;
+}
+
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-300 {
+  border-color: var(--border) !important;
+}
+
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border) !important;
+}
+
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover {
+  background-color: var(--surface-2) !important;
+}
+
+html.dark .hover\:bg-brand-muted\/40:hover {
+  background-color: rgba(20, 83, 45, 0.45) !important;
+}
+
+html.dark .ring-white {
+  --tw-ring-color: var(--surface) !important;
+}
+
+html.dark .shadow-card,
+html.dark .shadow-sm,
+html.dark .shadow-lg,
+html.dark .shadow-xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.45);
+}
+
+/* Status / pastel chips */
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-50\/60 {
+  background-color: rgba(6, 78, 59, 0.55) !important;
+}
+html.dark .bg-emerald-100,
+html.dark .bg-green-100 {
+  background-color: rgba(6, 95, 70, 0.75) !important;
+}
+html.dark .bg-emerald-200 {
+  background-color: rgba(4, 120, 87, 0.55) !important;
+}
+html.dark .text-emerald-800,
+html.dark .text-emerald-900,
+html.dark .text-emerald-950,
+html.dark .text-green-800 {
+  color: #bbf7d0 !important;
+}
+
+html.dark .bg-blue-50,
+html.dark .bg-blue-100 {
+  background-color: rgba(30, 58, 138, 0.55) !important;
+}
+html.dark .text-blue-700,
+html.dark .text-blue-800 {
+  color: #bfdbfe !important;
+}
+
+html.dark .bg-pink-100 {
+  background-color: rgba(157, 23, 77, 0.55) !important;
+}
+html.dark .text-pink-700 {
+  color: #fbcfe8 !important;
+}
+html.dark .hover\:bg-pink-200:hover {
+  background-color: rgba(190, 24, 93, 0.7) !important;
+}
+
+html.dark .bg-amber-50,
+html.dark .bg-amber-50\/60 {
+  background-color: rgba(120, 53, 15, 0.45) !important;
+}
+html.dark .bg-amber-100,
+html.dark .bg-amber-200 {
+  background-color: rgba(146, 64, 14, 0.55) !important;
+}
+html.dark .text-amber-900 {
+  color: #fde68a !important;
+}
+html.dark .border-amber-200 {
+  border-color: #92400e !important;
+}
+
+html.dark .bg-lime-100 {
+  background-color: rgba(54, 83, 20, 0.65) !important;
+}
+html.dark .text-green-800 {
+  color: #bbf7d0 !important;
+}
+
+html.dark .bg-yellow-100 {
+  background-color: rgba(113, 63, 18, 0.55) !important;
+}
+html.dark .text-yellow-800 {
+  color: #fde68a !important;
+}
+
+html.dark .bg-\[\#DBEAFE\] {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+}
+html.dark .text-\[\#1D4ED8\] {
+  color: #93c5fd !important;
+}
+
+html.dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.45) !important;
+}
+html.dark .border-red-200 {
+  border-color: #7f1d1d !important;
+}
+html.dark .text-red-950,
+html.dark .text-red-800,
+html.dark .text-red-700 {
+  color: #fecaca !important;
+}
+
+html.dark .hover\:bg-red-50:hover {
+  background-color: rgba(127, 29, 29, 0.55) !important;
+}
+
+html.dark .border-emerald-200 {
+  border-color: #065f46 !important;
+}
+
+/* Inputs / textareas keep readable fields */
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark textarea,
+html.dark select {
+  color: var(--text);
+  background-color: var(--surface-2);
+  border-color: var(--border);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #9ca3af !important;
+  opacity: 1;
+}
+
+/* Tables */
+html.dark table thead,
+html.dark th {
+  background-color: var(--surface-2);
+  color: var(--text);
+}
+
+html.dark .login-canvas {
+  background-color: var(--login-canvas) !important;
+}
+html.dark .login-orb {
+  background-color: var(--login-orb) !important;
+}
+
+/* Keep pure white only where marked (e.g. logo discs on green sidebar) */
+html.dark .bg-keep-white {
+  background-color: #ffffff !important;
+}
+
+/* Header icon accents in dark mode */
+html.dark .text-\[\#1a6b45\] {
+  color: #86efac !important;
+}
+
+/* HOD compare teacher cards — readable in light + dark */
+.compare-card {
+  border-width: 1px;
+}
+.compare-card__title {
+  color: #111827;
+}
+.compare-card__meta,
+.compare-card__stat {
+  color: #374151;
+}
+.compare-card--pink {
+  background-color: #fce7f3;
+  border-color: #fbcfe8;
+}
+.compare-card--emerald {
+  background-color: #d1fae5;
+  border-color: #a7f3d0;
+}
+.compare-card--amber {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+}
+.compare-card--sky {
+  background-color: #e0f2fe;
+  border-color: #bae6fd;
+}
+.compare-card--violet {
+  background-color: #ede9fe;
+  border-color: #ddd6fe;
+}
+
+html.dark .compare-card__title,
+html.dark .compare-card__stat {
+  color: #f3f4f6 !important;
+}
+html.dark .compare-card__meta {
+  color: #d1d5db !important;
+}
+html.dark .compare-card--pink {
+  background-color: #4c0519 !important;
+  border-color: #9f1239 !important;
+}
+html.dark .compare-card--emerald {
+  background-color: #052e16 !important;
+  border-color: #166534 !important;
+}
+html.dark .compare-card--amber {
+  background-color: #451a03 !important;
+  border-color: #b45309 !important;
+}
+html.dark .compare-card--sky {
+  background-color: #0c4a6e !important;
+  border-color: #0369a1 !important;
+}
+html.dark .compare-card--violet {
+  background-color: #2e1065 !important;
+  border-color: #6d28d9 !important;
+}
+
+/* Weekly topic week cards */
+.week-card {
+  border-width: 1px;
+}
+.week-card--complete {
+  background-color: #d1fae5 !important;
+  border-color: #a7f3d0 !important;
+}
+.week-card--progress {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+}
+.week-card--pending {
+  background-color: #fef2f2 !important;
+  border-color: #fecaca !important;
+}
+.week-card__chevron {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #374151;
+}
+.week-topic-row {
+  background-color: rgba(255, 255, 255, 0.72);
+}
+.week-topic-row__title {
+  color: #1f2937;
+}
+
+html.dark .week-card--complete {
+  background-color: #062b1b !important;
+  border-color: #0c4a2e !important;
+}
+html.dark .week-card--progress {
+  background-color: #2e1d08 !important;
+  border-color: #5c3a0f !important;
+}
+html.dark .week-card--pending {
+  background-color: #0a1719 !important;
+  border-color: #1b2c2e !important;
+}
+html.dark .week-card {
+  color: #f3f4f6;
+}
+html.dark .week-card__chevron {
+  background-color: #132427 !important;
+  color: #e5e7eb !important;
+  border: 1px solid #1b2c2e !important;
+}
+html.dark .week-topic-row {
+  background-color: #122225 !important;
+  border-color: #1b2c2e !important;
+}
+html.dark .week-topic-row__title {
+  color: #f3f4f6 !important;
+}
+
+.week-topic-panel {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+html.dark .week-topic-panel {
+  background-color: #091719 !important;
+  border-color: #1b2c2e !important;
+}
+
+/* Extra pastel remaps used on sync / weekly screens */
+html.dark .bg-sky-100 {
+  background-color: #0c4a6e !important;
+}
+html.dark .bg-violet-100 {
+  background-color: #2e1065 !important;
+}
+html.dark .bg-purple-50 {
+  background-color: rgba(46, 16, 101, 0.55) !important;
+}
+html.dark .hover\:bg-purple-100:hover {
+  background-color: rgba(76, 29, 149, 0.7) !important;
+}
+html.dark .bg-amber-100 {
+  background-color: rgba(120, 53, 15, 0.65) !important;
+}
+html.dark .bg-pink-100 {
+  background-color: rgba(131, 24, 67, 0.65) !important;
+}
+html.dark .border-sky-200 {
+  border-color: #0369a1 !important;
+}
+html.dark .border-violet-200 {
+  border-color: #6d28d9 !important;
+}
+html.dark .border-pink-200 {
+  border-color: #9f1239 !important;
+}
+html.dark .border-amber-200 {
+  border-color: #b45309 !important;
+}
+html.dark .text-sky-900 {
+  color: #e0f2fe !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Soft rectangular buttons — slight corner radius across the whole app       */
+/* !important also overrides inline borderRadius styles set in JSX            */
+/* -------------------------------------------------------------------------- */
+
+button,
+input[type='button'],
+input[type='submit'],
+input[type='reset'],
+.app-btn-primary,
+.app-btn-primary-block,
+.app-btn-outline,
+.app-btn-ghost,
+.app-btn-danger,
+.app-logout-btn {
+  border-radius: 0.375rem !important; /* ~6px soft rectangle */
+}
+
+button::before,
+button::after {
+  border-radius: 0.375rem !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Buttons follow the sidebar tab look: bordered outline, no fill.            */
+/* On hover they fill green with a soft shadow (like sidebar hover state).    */
+/* -------------------------------------------------------------------------- */
+
+.app-btn-primary,
+.app-btn-primary-block,
+button.font-black.text-white:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]),
+button.font-extrabold.text-white:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]),
+button.font-bold.text-white:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]),
+button.text-white.font-semibold:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]) {
+  background-color: transparent !important;
+  color: var(--btn-fg) !important;
+  border: 1px solid var(--btn-border) !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.app-btn-primary:hover:not(:disabled),
+.app-btn-primary-block:hover:not(:disabled),
+button.font-black.text-white:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]):hover:not(:disabled),
+button.font-extrabold.text-white:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]):hover:not(:disabled),
+button.font-bold.text-white:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]):hover:not(:disabled),
+button.text-white.font-semibold:not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-gray"]):hover:not(:disabled) {
+  background-color: var(--btn-hover-bg) !important;
+  color: #ffffff !important;
+  border-color: var(--btn-hover-border) !important;
+  box-shadow: var(--btn-hover-shadow) !important;
+}
+
+/* Sidebar logout always matches nav: white text + white border on dark rail */
+.app-sidebar .app-logout-btn,
+.app-logout-btn {
+  background-color: transparent !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+}
+.app-sidebar .app-logout-btn:hover:not(:disabled),
+.app-logout-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  box-shadow: none !important;
+}
+
+/* Danger / delete keep the red outline so intent stays obvious */
+button.bg-red-600,
+button.bg-red-500,
+.app-btn-danger {
+  background-color: transparent !important;
+  color: var(--btn-danger-fg) !important;
+  border: 1px solid var(--btn-danger-fg) !important;
+  box-shadow: none !important;
+}
+button.bg-red-600:hover:not(:disabled),
+button.bg-red-500:hover:not(:disabled),
+.app-btn-danger:hover:not(:disabled) {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.35) !important;
 }

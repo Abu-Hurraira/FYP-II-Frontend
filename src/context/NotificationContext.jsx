@@ -87,6 +87,7 @@ export function NotificationProvider({ children }) {
                 ? "border-emerald-200 bg-emerald-50 text-emerald-950"
                 : "border-red-200 bg-red-50 text-red-950"
             }`}
+            data-toast={t.variant}
             role="status"
           >
             {t.title ? <p className="text-sm font-bold">{t.title}</p> : null}
@@ -114,14 +115,14 @@ export function NotificationProvider({ children }) {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40"
                 onClick={() => resolveConfirm(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="app-btn-primary rounded-2xl px-4 py-2 text-sm"
                 onClick={() => resolveConfirm(true)}
               >
                 OK

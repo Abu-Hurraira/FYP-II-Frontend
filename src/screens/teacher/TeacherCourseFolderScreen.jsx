@@ -122,12 +122,12 @@ export default function TeacherCourseFolderScreen() {
       </div>
 
       {!overview?.isCreated ? (
-        <div className="mx-4 mt-6 rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm sm:mx-6 lg:mx-8">
+        <div className="mx-4 mt-6 rounded-2xl border border-gray-100 bg-white shadow-card p-6 text-center shadow-sm sm:mx-6 lg:mx-8">
           <p className="text-gray-600">MasterFolder has not been created yet.</p>
           <button
             type="button"
             onClick={handleCreate}
-            className="mt-5 rounded-lg bg-brand px-6 py-3 font-extrabold text-white"
+            className="app-btn-primary mt-5 rounded-2xl px-6 py-3 font-extrabold"
           >
             Create MasterFolder
           </button>
@@ -179,7 +179,7 @@ export default function TeacherCourseFolderScreen() {
                     },
                   })
                 }
-                className="mb-2.5 flex w-full min-h-[48px] items-center rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-gray-50"
+                className="mb-2.5 flex w-full min-h-[48px] items-center rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">

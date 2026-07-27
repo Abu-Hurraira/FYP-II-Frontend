@@ -12,6 +12,7 @@ import SectionAdminLayout from "./layouts/SectionAdminLayout.jsx";
 
 import TeacherHomeScreen from "./screens/teacher/TeacherHomeScreen.jsx";
 import TeacherCourseMenuScreen from "./screens/teacher/TeacherCourseMenuScreen.jsx";
+import TeacherClosScreen from "./screens/teacher/TeacherClosScreen.jsx";
 import WeeklyContentScreen from "./screens/teacher/WeeklyContentScreen.jsx";
 import TeacherPlaceholderScreen from "./screens/teacher/TeacherPlaceholderScreen.jsx";
 import TeacherSubmitFoldersScreen from "./screens/teacher/TeacherSubmitFoldersScreen.jsx";
@@ -49,6 +50,8 @@ import HodCoursesScreen from "./screens/hod/HodCoursesScreen.jsx";
 import HodCourseProgressScreen from "./screens/hod/HodCourseProgressScreen.jsx";
 import HodWeeklyStatusScreen from "./screens/hod/HodWeeklyStatusScreen.jsx";
 import HodSubmittedFoldersScreen from "./screens/hod/HodSubmittedFoldersScreen.jsx";
+import HodCloApprovalsScreen from "./screens/hod/HodCloApprovalsScreen.jsx";
+import HodNotificationsScreen from "./screens/hod/HodNotificationsScreen.jsx";
 import HodAllocationScreen from "./screens/hod/HodAllocationScreen.jsx";
 import HodSubmittedFolderDetailScreen from "./screens/hod/HodSubmittedFolderDetailScreen.jsx";
 import HodSubmittedFolderFilesScreen from "./screens/hod/HodSubmittedFolderFilesScreen.jsx";
@@ -149,6 +152,10 @@ const App = () => {
           element={<WeeklyContentScreen />}
         />
         <Route
+          path="course/:offeredCourseId/clos"
+          element={<TeacherClosScreen />}
+        />
+        <Route
           path="course/:offeredCourseId/folder"
           element={<TeacherCourseFolderScreen />}
         />
@@ -223,6 +230,8 @@ const App = () => {
         <Route path="graders" element={<HodGradersScreen />} />
         <Route path="allocation" element={<HodAllocationScreen />} />
         <Route path="submitted-folders" element={<HodSubmittedFoldersScreen />} />
+        <Route path="clo-approvals" element={<HodCloApprovalsScreen />} />
+        <Route path="notifications" element={<HodNotificationsScreen />} />
         <Route path="submitted-folders/:offeredCourseId" element={<HodSubmittedFolderDetailScreen />} />
         <Route
           path="submitted-folders/:offeredCourseId/folder/:directoryId"

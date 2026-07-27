@@ -1,16 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
         brand: {
-          DEFAULT: "#1a8754",
-          dark: "#136641",
-          light: "#d1f4e0",
-          muted: "#e8f7ef",
+          DEFAULT: "#22c55e",
+          dark: "#15803d",
+          deeper: "#166534",
+          accent: "#4ade80",
+          light: "var(--brand-light)",
+          muted: "var(--brand-muted)",
+          soft: "var(--brand-soft)",
         },
-        page: "#f8f9fa",
+        page: "var(--page)",
+        surface: "var(--surface)",
+        sidebar: {
+          DEFAULT: "#1a6b45",
+          hover: "#1f7a4f",
+          card: "#228556",
+        },
       },
       fontFamily: {
         sans: [
@@ -22,7 +32,35 @@ export default {
           "sans-serif",
         ],
       },
+      boxShadow: {
+        card: "var(--shadow-card)",
+        soft: "var(--shadow-soft)",
+      },
     },
   },
+  safelist: [
+    "bg-brand",
+    "bg-brand-accent",
+    "bg-brand-dark",
+    "bg-brand-light",
+    "bg-brand-muted",
+    "bg-brand-soft",
+    "text-brand",
+    "text-brand-dark",
+    "text-brand-accent",
+    "border-brand",
+    "border-brand-soft",
+    "hover:bg-brand",
+    "hover:bg-brand-accent",
+    "hover:bg-brand-muted",
+    "hover:bg-brand-muted/40",
+    "hover:border-brand-soft",
+    "hover:text-brand-dark",
+    "focus-visible:ring-brand/40",
+    "!bg-[#4ade80]",
+    "hover:!bg-[#34d399]",
+    "!border-0",
+    "!text-white",
+  ],
   plugins: [],
 };

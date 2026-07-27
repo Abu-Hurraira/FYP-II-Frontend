@@ -5,11 +5,11 @@ import PageBackButton from "../../components/PageBackButton.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
 const COMPARE_COLORS = [
-  "bg-pink-100 border-pink-200",
-  "bg-emerald-100 border-emerald-200",
-  "bg-amber-100 border-amber-200",
-  "bg-sky-100 border-sky-200",
-  "bg-violet-100 border-violet-200",
+  "compare-card compare-card--pink",
+  "compare-card compare-card--emerald",
+  "compare-card compare-card--amber",
+  "compare-card compare-card--sky",
+  "compare-card compare-card--violet",
 ];
 
 function teacherProgressFromMatrix(matrix, offeredCourseId) {
@@ -141,10 +141,10 @@ export default function HodCourseProgressScreen() {
                       className={`flex w-full items-center justify-between rounded-xl border p-4 text-left shadow-sm transition hover:opacity-90 ${color}`}
                     >
                       <div>
-                        <p className="font-bold text-gray-900">{teacher.teacherName}</p>
-                        <p className="text-xs text-gray-600">{teacher.sectionName}</p>
+                        <p className="compare-card__title font-bold">{teacher.teacherName}</p>
+                        <p className="compare-card__meta text-xs">{teacher.sectionName}</p>
                       </div>
-                      <p className="text-lg font-extrabold text-gray-800">
+                      <p className="compare-card__stat text-lg font-extrabold">
                         {progress.covered}/{progress.total || "—"} Topics
                       </p>
                     </button>

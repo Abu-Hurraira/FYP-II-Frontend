@@ -22,6 +22,7 @@ const MAIN_TAB_PATHS = new Set([
   "/hod/graders",
   "/hod/allocation",
   "/hod/submitted-folders",
+  "/hod/notifications",
   "/hod/profile",
 ]);
 
@@ -48,7 +49,7 @@ export default function PageBackButton({ className = "" }) {
       type="button"
       onClick={() => navigate(-1)}
       aria-label="Go back"
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl font-semibold leading-none text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${className}`}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-xl font-semibold leading-none text-gray-600 transition hover:bg-brand-muted hover:text-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${className}`}
     >
       <span aria-hidden="true">←</span>
     </button>

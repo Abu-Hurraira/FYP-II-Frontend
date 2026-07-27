@@ -163,8 +163,7 @@ export default function ProfileScreen() {
               <button
                 type="submit"
                 disabled={saving || !isDirty}
-                className="flex w-full items-center justify-center rounded-lg py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ backgroundColor: theme.colors.primaryDark }}
+                className="app-btn-primary app-btn-primary-block rounded-lg py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? (
                   <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />

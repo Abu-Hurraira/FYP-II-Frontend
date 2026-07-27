@@ -48,13 +48,13 @@ export function weekCardStatus(topic, weekIndex = 0) {
 }
 
 export function weekCardClass(status) {
-  if (status === "complete") return "bg-emerald-100 border-emerald-200";
-  if (status === "in-progress") return "bg-amber-100 border-amber-200";
-  return "bg-red-50 border-red-200";
+  if (status === "complete") return "week-card week-card--complete";
+  if (status === "in-progress") return "week-card week-card--progress";
+  return "week-card week-card--pending";
 }
 
 export function progressBarColor(percentage) {
-  if (percentage >= 80) return "#1a8754";
+  if (percentage >= 80) return "#22c55e";
   return "#DC2626";
 }
 
@@ -122,13 +122,13 @@ export function teacherFolderSubmissionStatus(record) {
 export function teacherFolderStatusBadgeClass(status) {
   switch (status) {
     case "Approved":
-      return "bg-emerald-100 text-emerald-800";
+      return "bg-green-100 text-green-800";
     case "Rejected":
       return "bg-red-100 text-red-800";
     case "Submitted":
       return "bg-blue-100 text-blue-800";
     default:
-      return "bg-amber-100 text-amber-900";
+      return "bg-green-100 text-green-800";
   }
 }
 

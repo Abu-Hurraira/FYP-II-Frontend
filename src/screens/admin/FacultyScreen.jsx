@@ -183,7 +183,7 @@ const FacultyScreen = () => {
         ) : (
           <div className="space-y-2.5 pb-16">
             {faculty.map((item) => (
-              <div key={item.userId} className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <div key={item.userId} className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">{item.fullName}</p>
                   <p className="mt-0.5 text-xs text-gray-600">{item.email}</p>
@@ -222,11 +222,15 @@ const FacultyScreen = () => {
             <label className="text-sm font-extrabold">{editingUser ? "Change Rank" : "Rank"}</label>
             <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2" value={rank} onChange={(e) => setRank(e.target.value)} placeholder={editingUser ? "New Rank" : "e.g Assistant Professor"} />
             {!editingUser && (
-              <button type="button" onClick={() => setUploadVisible(true)} className="mb-4 rounded-full bg-lime-100 px-4 py-1 text-sm font-extrabold">
+              <button
+                type="button"
+                onClick={() => setUploadVisible(true)}
+                className="app-btn-primary app-btn-primary-block mb-3 w-full py-3 font-extrabold"
+              >
                 Upload File
               </button>
             )}
-            <button type="button" onClick={handleSaveUser} className="w-full rounded-lg py-3 font-extrabold text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" onClick={handleSaveUser} className="app-btn-primary app-btn-primary-block w-full py-3 font-extrabold">
               {editingUser ? "Save" : "Add Teacher"}
             </button>
           </div>
@@ -251,7 +255,7 @@ const FacultyScreen = () => {
               disabled={uploading}
               onClick={handleUploadExcel}
               className="mt-4 w-full rounded-lg py-3 font-extrabold text-white disabled:opacity-60"
-              style={{ backgroundColor: "#8FBD96" }}
+              style={{ backgroundColor: "#1a6b45" }}
             >
               {uploading ? "…" : "⬆ Upload"}
             </button>

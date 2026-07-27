@@ -118,10 +118,37 @@ export default function HodPloCourseMappingScreen() {
     });
   };
 
+  /** How much % is still free in this PLO column (other courses), optionally excluding one course being edited. */
+  const remainingForPlo = (ploId, excludeCourseId = null) => {
+    const ploKey = String(ploId);
+    let used = 0;
+    for (const courseId of courseIds) {
+      if (excludeCourseId != null && String(courseId) === String(excludeCourseId)) continue;
+      const cell = matrix[courseId]?.[ploKey];
+      if (cell?.mapped) used += Number(cell.weight) || 0;
+    }
+    return Math.max(0, Math.round((100 - used) * 100) / 100);
+  };
+
   const openMappingModal = (course, plo, ploIndex, currentWeight = 0) => {
+    const remaining = remainingForPlo(plo.ploId, course.courseId);
+    if (remaining <= 0 && !(currentWeight > 0)) {
+      showAlert(
+        "Limit reached",
+        `${ploDisplayLabel(plo, ploIndex)} already totals 100% across other courses. Reduce another course's % first.`
+      );
+      return;
+    }
+    if (remaining <= 0 && currentWeight > 0) {
+      showAlert(
+        "Column over 100%",
+        `${ploDisplayLabel(plo, ploIndex)} already uses 100% in other courses. Uncheck this mapping or lower another course's % before assigning a new value.`
+      );
+      return;
+    }
     setHoverTip(null);
-    setMappingModal({ course, plo, ploIndex });
-    setModalWeight(currentWeight > 0 ? String(currentWeight) : "");
+    setMappingModal({ course, plo, ploIndex, remaining });
+    setModalWeight(currentWeight > 0 ? String(Math.min(currentWeight, remaining)) : "");
   };
 
   const closeMappingModal = () => {
@@ -132,9 +159,19 @@ export default function HodPloCourseMappingScreen() {
   const handleModalSave = () => {
     if (!mappingModal) return;
 
+    const remaining = remainingForPlo(mappingModal.plo.ploId, mappingModal.course.courseId);
     const weight = Math.min(100, Math.max(0, Number(modalWeight) || 0));
+
     if (weight <= 0) {
       showAlert("Validation", "Enter a percentage greater than 0.");
+      return;
+    }
+
+    if (weight > remaining) {
+      showAlert(
+        "Validation",
+        `${ploDisplayLabel(mappingModal.plo, mappingModal.ploIndex)} only has ${remaining}% left (column max is 100%). Enter ${remaining}% or less.`
+      );
       return;
     }
 
@@ -145,8 +182,27 @@ export default function HodPloCourseMappingScreen() {
     closeMappingModal();
   };
 
+  /** Count how many cells have mapped === true across all courses and PLOs */
+  const mappedCount = useMemo(() => {
+    let count = 0;
+    for (const row of Object.values(matrix || {})) {
+      for (const cell of Object.values(row || {})) {
+        if (cell?.mapped) count += 1;
+      }
+    }
+    return count;
+  }, [matrix]);
+
   const handleSave = async () => {
     if (!valid) return;
+
+    if (mappedCount === 0) {
+      showAlert(
+        "Nothing to save",
+        "Select at least one checkbox to map a Course to a PLO before saving."
+      );
+      return;
+    }
 
     const totals = columnTotals(matrix, courseIds, sortedPlos);
     const invalidColumns = sortedPlos
@@ -169,7 +225,7 @@ export default function HodPloCourseMappingScreen() {
     try {
       setSaving(true);
       savePloCourseMapping(program.programId, matrix);
-      showAlert("Saved", "PLO–Course mapping saved successfully.");
+      showAlert("Saved", `PLO–Course mapping saved successfully (${mappedCount} mapping${mappedCount === 1 ? "" : "s"}).`);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -205,7 +261,7 @@ export default function HodPloCourseMappingScreen() {
           type="button"
           disabled={saving || loading || sortedPlos.length === 0}
           onClick={handleSave}
-          className="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+          className="app-btn-primary shrink-0 rounded-2xl px-4 py-2 text-sm shadow-sm disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -236,7 +292,7 @@ export default function HodPloCourseMappingScreen() {
             No courses found. Add courses under Courses first.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
             <table className="min-w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-amber-50">
@@ -283,7 +339,7 @@ export default function HodPloCourseMappingScreen() {
                   const row = getCourseRow(matrix, courseKey, sortedPlos);
 
                   return (
-                    <tr key={course.courseId} className="border-b border-gray-100 hover:bg-gray-50/80">
+                    <tr key={course.courseId} className="border-b border-gray-100 hover:bg-brand-muted/40/80">
                       <td className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-3">
                         <p className="font-semibold text-gray-900">{course.courseTitle}</p>
                         {course.courseCode ? (
@@ -384,14 +440,28 @@ export default function HodPloCourseMappingScreen() {
               <input
                 type="number"
                 min={1}
-                max={100}
+                max={mappingModal.remaining ?? 100}
                 value={modalWeight}
-                onChange={(e) => setModalWeight(e.target.value)}
-                className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                placeholder="e.g. 50"
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setModalWeight("");
+                    return;
+                  }
+                  const n = Number(raw);
+                  if (Number.isNaN(n)) return;
+                  const capped = Math.min(mappingModal.remaining ?? 100, Math.max(0, n));
+                  setModalWeight(String(capped));
+                }}
+                className="mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-card px-3 py-2 text-sm"
+                placeholder={`1 – ${mappingModal.remaining ?? 100}`}
                 autoFocus
               />
             </label>
+            <p className="mt-2 text-xs text-gray-500">
+              Remaining for {ploDisplayLabel(mappingModal.plo, mappingModal.ploIndex)}:{" "}
+              <strong>{mappingModal.remaining ?? 100}%</strong> (column cannot exceed 100%)
+            </p>
 
             <button
               type="button"

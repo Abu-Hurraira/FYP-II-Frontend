@@ -178,7 +178,7 @@ export default function TeacherFolderUploadScreen() {
           <p className="mt-3 text-center font-extrabold text-emerald-700">This folder is locked.</p>
         )}
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mt-6 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm">
           <p className="mb-2 font-extrabold text-gray-900">File Category</p>
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => (
@@ -202,7 +202,7 @@ export default function TeacherFolderUploadScreen() {
         </div>
 
         {!readOnly && !statusLoading && (
-          <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mt-4 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm">
             <label className="block cursor-pointer rounded-lg bg-gray-100 p-3 text-gray-600">
               <input type="file" className="hidden" onChange={pickFile} />
               {selectedFile?.name || "Choose file"}
@@ -210,7 +210,7 @@ export default function TeacherFolderUploadScreen() {
             <button
               type="button"
               onClick={upload}
-              className="mt-3 w-full rounded-lg bg-brand py-3 font-extrabold text-white"
+              className="mt-3 w-full app-btn-primary app-btn-primary-block rounded-2xl py-3 font-extrabold"
             >
               Upload File
             </button>
@@ -233,7 +233,7 @@ export default function TeacherFolderUploadScreen() {
             {filteredFiles.map((file) => (
               <div
                 key={file.fileId ?? file.FileId}
-                className="flex items-center rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+                className="flex items-center rounded-2xl border border-gray-100 bg-white shadow-card p-3 shadow-sm"
               >
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{file.fileName ?? file.FileName}</p>

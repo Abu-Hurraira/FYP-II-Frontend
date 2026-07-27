@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { enrichCoursesWithFolderReview, enrichCoursesWithSharedWeeklyContent, getAllTeacherCourses } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import DashboardWelcomeBanner from "../../components/DashboardWelcomeBanner.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
 import {
@@ -52,16 +53,10 @@ export default function TeacherHomeScreen() {
 
   return (
     <div className="min-h-full bg-page">
-      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">{displayName} Dashboard</h1>
-            <p className="mt-0.5 text-xs text-gray-500">{displayName} courses</p>
-          </div>
-        </div>
-      </div>
+      <div className="w-full px-4 pb-8 pt-4 sm:px-6 lg:px-8">
+        <DashboardWelcomeBanner name={displayName} />
 
-      <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
+        <div className="mt-4">
         {loading ? (
           <div className="flex justify-center py-20">
             <div
@@ -70,7 +65,7 @@ export default function TeacherHomeScreen() {
             />
           </div>
         ) : (
-          <div className="flex flex-col gap-2.5 pt-2">
+          <div className="flex flex-col gap-2.5">
             {courses.map((course) => {
               const pct = Math.round(course.weeklyProgressPercentage || 0);
               const status = teacherFolderSubmissionStatus(course);
@@ -84,15 +79,20 @@ export default function TeacherHomeScreen() {
                       `/teacher/course/${course.offeredCourseId}/menu?teacherUserId=${teacherUserId ?? ""}`
                     )
                   }
-                  className="flex w-full flex-col rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
+                  className="app-card flex w-full flex-col p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 flex-1 items-start gap-4">
-                      <img
-                        src={subjectIconUrl}
-                        alt=""
-                        className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                      />
+                      <div
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                        style={{ backgroundColor: "var(--brand-light)" }}
+                      >
+                        <img
+                          src={subjectIconUrl}
+                          alt=""
+                          className="h-7 w-7 object-contain"
+                        />
+                      </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900">{course.courseTitle}</p>
                         <p className="mt-0.5 text-xs text-gray-500">{course.sectionName}</p>
@@ -100,11 +100,13 @@ export default function TeacherHomeScreen() {
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span
-                        className={`rounded-lg px-3 py-1 text-xs font-bold ${teacherFolderStatusBadgeClass(status)}`}
+                        className={`rounded-full px-3 py-1 text-xs font-bold ${teacherFolderStatusBadgeClass(status)}`}
                       >
                         {status}
                       </span>
-                      <span className="text-xl text-gray-300">›</span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-lg text-gray-400">
+                        ›
+                      </span>
                     </div>
                   </div>
 
@@ -112,14 +114,15 @@ export default function TeacherHomeScreen() {
                     <div className="mt-4">
                       <div className="mb-2 flex justify-between text-xs">
                         <span className="text-gray-500">Progress</span>
-                        <span className="font-bold text-gray-600">{pct}%</span>
+                        <span className="font-bold" style={{ color: "var(--brand)" }}>
+                          {pct}%
+                        </span>
                       </div>
-                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div className="app-progress-track">
                         <div
-                          className="h-full rounded-full transition-all"
+                          className="app-progress-fill"
                           style={{
-                            width: `${Math.min(Math.max(pct, 0), 100)}%`,
-                            backgroundColor: theme.colors.primary,
+                            width: `${Math.min(Math.max(Number(pct) || 0, 0), 100)}%`,
                           }}
                         />
                       </div>
@@ -138,6 +141,7 @@ export default function TeacherHomeScreen() {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

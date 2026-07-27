@@ -76,7 +76,7 @@ export default function HodSubmittedFolderFilesScreen() {
               return (
                 <div
                   key={file.fileId ?? file.FileId}
-                  className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                  className="rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm"
                 >
                   <p className="text-sm font-semibold text-gray-900">{file.fileName ?? file.FileName}</p>
                   <p className="mt-1 text-sm text-gray-600">{file.fileCategory ?? file.FileCategory ?? "—"}</p>

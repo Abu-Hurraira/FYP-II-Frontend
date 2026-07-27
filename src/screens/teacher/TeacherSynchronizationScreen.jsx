@@ -68,9 +68,9 @@ function TeacherColumnHeader({ teacher }) {
       className="w-28 min-w-[5.5rem] max-w-[8rem] px-1 py-2 text-center align-bottom"
       title={section ? `${name} — ${section}` : name}
     >
-      <span className="block text-[11px] font-extrabold leading-tight text-gray-800">{name}</span>
+      <span className="block text-[11px] font-extrabold leading-tight text-gray-800 dark:text-gray-200">{name}</span>
       {section ? (
-        <span className="mt-1 block text-[10px] font-semibold leading-snug text-gray-500">{section}</span>
+        <span className="mt-1 block text-[10px] font-semibold leading-snug text-gray-500 dark:text-gray-400">{section}</span>
       ) : null}
     </th>
   );
@@ -102,12 +102,12 @@ export default function TeacherSynchronizationScreen() {
 
   return (
     <div className="relative min-h-full bg-page pb-24">
-      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
+      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8 dark:border-[#1b2c2e] dark:bg-[#071113]">
         <div className="flex flex-wrap items-start gap-3">
           <PageBackButton className="mt-0.5 shrink-0" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-gray-900">Compare</h1>
-            <p className="mt-0.5 text-xs text-gray-500">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Compare</h1>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {data?.courseTitle ? `${data.courseTitle} · ` : ""}
               {data?.currentTeacherName || "Teacher"}
               {data?.currentSectionName ? ` (${data.currentSectionName})` : ""}
@@ -119,7 +119,7 @@ export default function TeacherSynchronizationScreen() {
         </div>
       </div>
 
-      <div className="flex gap-2 px-4 pt-3 sm:px-6 lg:px-8">
+      <div className="flex gap-2.5 px-4 pt-3 sm:px-6 lg:px-8">
         <TabButton title="All Matrix" active={activeTab === "matrix"} onPress={() => setActiveTab("matrix")} />
         <TabButton title="Common" active={activeTab === "common"} onPress={() => setActiveTab("common")} />
         <TabButton title="Gaps" active={activeTab === "gaps"} onPress={() => setActiveTab("gaps")} />
@@ -139,7 +139,6 @@ export default function TeacherSynchronizationScreen() {
           {activeTab === "gaps" && <GapsTab data={data} currentOfferedCourseId={currentOc} />}
         </>
       )}
-
     </div>
   );
 }
@@ -149,8 +148,10 @@ function TabButton({ title, active, onPress }) {
     <button
       type="button"
       onClick={onPress}
-      className={`flex-1 rounded-xl py-2 text-sm font-extrabold ${
-        active ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-600"
+      className={`flex-1 rounded-xl py-2.5 text-sm font-extrabold transition-all ${
+        active
+          ? "bg-emerald-600 text-white shadow-sm"
+          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:text-gray-200 dark:hover:bg-[#122225]"
       }`}
     >
       {title}
@@ -179,10 +180,10 @@ function MatrixTab({ data }) {
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="space-y-1">
           {matrix.map((row) => (
-            <tr key={row.topicId} className="bg-white shadow-sm">
-              <td className="max-w-xs px-4 py-4 text-base font-extrabold text-gray-900">
+            <tr key={row.topicId} className="bg-white shadow-sm dark:bg-[#0c181a] dark:border-b dark:border-[#1b2c2e]">
+              <td className="max-w-xs px-4 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">
                 {row.topicName}
               </td>
               {(row.statuses ?? []).map((status) => (
@@ -200,11 +201,6 @@ function CommonTab({ data }) {
   const matrix = data?.matrix ?? [];
   const teachers = data?.teachers ?? [];
 
-  /**
-   * Common covered topics:
-   * - show if at least 2 teachers/sections completed it (so it's truly "common"),
-   * - also naturally includes "all teachers" (done === total).
-   */
   const commonRows = useMemo(() => {
     const total = Math.max(teachers.length, 0);
     const minDone = total <= 1 ? 1 : 2;
@@ -237,8 +233,8 @@ function CommonTab({ data }) {
 
   return (
     <div className="px-4 py-4 sm:px-6 lg:px-8">
-      <p className="mb-4 text-sm text-gray-600">
-        <span className="font-semibold text-gray-800">Common covered topics</span> are completed by{" "}
+      <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        <span className="font-semibold text-gray-800 dark:text-gray-200">Common covered topics</span> are completed by{" "}
         <strong>2+ teachers/sections</strong>. Topics completed by <strong>all {teachers.length}</strong> show as “All”.
       </p>
       <div className="overflow-x-auto">
@@ -261,12 +257,14 @@ function CommonTab({ data }) {
               const { done, total } = rowCoverage(row);
               const allDone = total > 0 && done === total;
               return (
-                <tr key={row.topicId} className="bg-white shadow-sm">
-                  <td className="max-w-xs px-4 py-4 text-base font-extrabold text-gray-900">{row.topicName}</td>
+                <tr key={row.topicId} className="bg-white shadow-sm dark:bg-[#0c181a] dark:border-b dark:border-[#1b2c2e]">
+                  <td className="max-w-xs px-4 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">{row.topicName}</td>
                   <td className="px-2 py-4 text-center align-middle">
                     <span
                       className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-black ${
-                        allDone ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-900"
+                        allDone
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400"
+                          : "bg-sky-100 text-sky-900 dark:bg-sky-500/20 dark:text-sky-300"
                       }`}
                     >
                       {allDone ? "All" : `${done}/${total}`}
@@ -310,24 +308,24 @@ function GapsTab({ data, currentOfferedCourseId }) {
     <div className="space-y-4 px-6 py-6">
       <p className="text-xs font-black uppercase text-gray-400">Your section is behind on these topics</p>
       {gaps.map((gap) => (
-        <div key={gap.topicId} className="rounded-xl border border-red-200 bg-white p-5 shadow">
+        <div key={gap.topicId} className="rounded-xl border border-red-200 bg-white p-5 shadow dark:border-red-900/40 dark:bg-[#0c181a]">
           <div className="flex items-center gap-2">
-            <p className="flex-1 text-lg font-black text-gray-900">{gap.topicName}</p>
+            <p className="flex-1 text-base font-bold text-gray-900 dark:text-white">{gap.topicName}</p>
             <span className="rounded bg-red-500 px-2 py-1 text-xs font-black text-white">{gap.gapLevel}</span>
           </div>
-          <p className="mt-3 font-extrabold text-red-500">
+          <p className="mt-3 text-xs font-bold text-red-500 dark:text-red-400">
             Missing in: {gap.missingInTeacher}
             {gap.missingInSection ? ` (${gap.missingInSection})` : ""}
           </p>
-          <hr className="my-4 border-red-100" />
+          <hr className="my-4 border-red-100 dark:border-red-900/30" />
           <div className="flex items-center">
-            <p className="flex-1 text-sm font-bold text-gray-500">Covered by {gap.coveredByCount} other section(s)</p>
+            <p className="flex-1 text-xs font-bold text-gray-500 dark:text-gray-400">Covered by {gap.coveredByCount} other section(s)</p>
             <button
               type="button"
               onClick={() =>
                 showAlert("Covered by", (gap.coveredByTeachers ?? []).join("\n") || "No details")
               }
-              className="font-black text-emerald-600"
+              className="text-xs font-bold text-emerald-600 dark:text-emerald-400"
             >
               View Details →
             </button>
@@ -341,7 +339,7 @@ function GapsTab({ data, currentOfferedCourseId }) {
 function EmptyMessage({ text }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 sm:px-6">
-      <p className="max-w-md text-center text-base font-bold text-gray-500">{text}</p>
+      <p className="max-w-md text-center text-base font-bold text-gray-500 dark:text-gray-400">{text}</p>
     </div>
   );
 }

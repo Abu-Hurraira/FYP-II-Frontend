@@ -24,14 +24,19 @@ export default function HodSubmittedFoldersScreen() {
   const loadFolders = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getHodSubmittedFolders();
-      setFolders(data || []);
+      if (!hodUserId) {
+        setFolders([]);
+        return;
+      }
+      const data = await getHodSubmittedFolders(hodUserId);
+      setFolders(Array.isArray(data) ? data : []);
     } catch (error) {
-      showAlert("Error", error.message);
+      setFolders([]);
+      showAlert("Error", error.message || "Could not load submitted folders.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [hodUserId]);
 
   useEffect(() => {
     loadFolders();
@@ -131,7 +136,7 @@ export default function HodSubmittedFoldersScreen() {
               return (
                 <article
                   key={item.offeredCourseId}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -179,7 +184,7 @@ export default function HodSubmittedFoldersScreen() {
                       type="button"
                       disabled={busy}
                       onClick={() => navigate(`/hod/submitted-folders/${item.offeredCourseId}`)}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40 disabled:opacity-60"
                     >
                       View
                     </button>

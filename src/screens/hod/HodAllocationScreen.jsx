@@ -147,7 +147,7 @@ export default function HodAllocationScreen() {
             type="button"
             onClick={handleSave}
             disabled={saving || loading}
-            className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            className="app-btn-primary rounded-2xl px-5 py-2.5 text-sm disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save Allocation"}
           </button>
@@ -176,7 +176,7 @@ export default function HodAllocationScreen() {
             No offered courses found. Add courses in a session first.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
                 <tr>
@@ -196,7 +196,7 @@ export default function HodAllocationScreen() {
                   const row = normalizeAllocationRow(rows[key] ?? EMPTY_UPLOAD_ALLOCATION_ROW);
 
                   return (
-                    <tr key={course.offeredCourseId} className="hover:bg-gray-50/80">
+                    <tr key={course.offeredCourseId} className="hover:bg-brand-muted/40/80">
                       <td className="px-3 py-3 align-middle">
                         <p className="font-semibold text-gray-900">{course.courseTitle}</p>
                         {course.courseCode ? (
