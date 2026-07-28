@@ -25,8 +25,11 @@ export function normalizeAllocationRow(raw) {
   if (!raw || typeof raw !== "object") {
     return { ...EMPTY_UPLOAD_ALLOCATION_ROW };
   }
+  const hasClos = Boolean(raw.clos ?? raw.CanUploadCLOs);
   return {
-    clos: Boolean(raw.clos ?? raw.CanUploadCLOs),
+    clos: hasClos,
+    cloPloMapping: Boolean(raw.cloPloMapping ?? raw.CanManageCloPloMapping ?? hasClos),
+    cloTaskMapping: Boolean(raw.cloTaskMapping ?? raw.CanManageCloTaskMapping ?? hasClos),
     mid: Boolean(raw.mid ?? raw.CanUploadMid),
     final: Boolean(raw.final ?? raw.CanUploadFinal),
     folderTemplate: Boolean(raw.folderTemplate ?? raw.CanUploadFolderTemplate),
@@ -87,7 +90,7 @@ export function pickSectionARow(courses = []) {
 }
 
 export function rowHasAnyPermission(row) {
-  return Boolean(row?.clos || row?.mid || row?.final || row?.folderTemplate);
+  return Boolean(row?.clos || row?.cloPloMapping || row?.cloTaskMapping || row?.mid || row?.final || row?.folderTemplate);
 }
 
 /** Group offered courses by course id/title and pick Section A row for defaults. */

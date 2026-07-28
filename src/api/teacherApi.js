@@ -126,6 +126,106 @@ export async function getCourseMenu(offeredCourseId) {
   };
 }
 
+export async function getAssessmentSummary(offeredCourseId, teacherUserId) {
+  return await request(
+    `/Assessments/offered-course/${offeredCourseId}/summary?teacherUserId=${teacherUserId || ""}`
+  );
+}
+
+export async function saveCloTaskCell(programCourseId, payload) {
+  return await request(`/CloTaskMappings/program-course/${programCourseId}/cell`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getCloPloMatrix(programCourseId, teacherUserId, offeredCourseId) {
+  return await request(
+    `/PLOCLOMappings/program-course/${programCourseId}/matrix?teacherUserId=${teacherUserId || ""}&offeredCourseId=${offeredCourseId || ""}`
+  );
+}
+
+export async function saveCloPloCell(programCourseId, payload) {
+  return await request(`/PLOCLOMappings/program-course/${programCourseId}/cell`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function submitContentForReview(programCourseId, payload) {
+  return await request(`/ContentSubmission/program-course/${programCourseId}/submit`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getContentStatuses(programCourseId, teacherUserId, offeredCourseId) {
+  return await request(
+    `/ContentSubmission/program-course/${programCourseId}/status?teacherUserId=${teacherUserId || ""}&offeredCourseId=${offeredCourseId || ""}`
+  );
+}
+
+export async function getAssessmentsList(offeredCourseId, teacherUserId, typeName = "Assignment") {
+  return await request(
+    `/Assessments/offered-course/${offeredCourseId}?teacherUserId=${teacherUserId || ""}&assessmentTypeName=${typeName}`
+  );
+}
+
+export async function getAvailableClos(offeredCourseId, teacherUserId, assessmentTypeName) {
+  const typeParam = assessmentTypeName ? `&assessmentTypeName=${encodeURIComponent(assessmentTypeName)}` : "";
+  return await request(
+    `/Assessments/offered-course/${offeredCourseId}/available-clos?teacherUserId=${teacherUserId || ""}${typeParam}`
+  );
+}
+
+export async function createAssessment(payload) {
+  return await request("/Assessments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAssessmentDetail(assessmentId, teacherUserId) {
+  return await request(
+    `/Assessments/${assessmentId}?teacherUserId=${teacherUserId || ""}`
+  );
+}
+
+export async function updateAssessment(assessmentId, payload) {
+  return await request(`/Assessments/${assessmentId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addAssessmentQuestion(assessmentId, payload) {
+  return await request(`/Assessments/${assessmentId}/questions`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadAssessmentFile(assessmentId, teacherUserId, filePurpose, file) {
+  const formData = new FormData();
+  formData.append("teacherUserId", teacherUserId);
+  formData.append("filePurpose", filePurpose);
+  formData.append("file", file);
+
+  const response = await fetch(`/api/Assessments/${assessmentId}/files`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "File upload failed.");
+  }
+  return await response.json();
+}
+
 export async function getWeeklyContent(offeredCourseId) {
   return await request(`/TeacherWeeklyContent/${offeredCourseId}`);
 }

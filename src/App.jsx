@@ -13,6 +13,10 @@ import SectionAdminLayout from "./layouts/SectionAdminLayout.jsx";
 import TeacherHomeScreen from "./screens/teacher/TeacherHomeScreen.jsx";
 import TeacherCourseMenuScreen from "./screens/teacher/TeacherCourseMenuScreen.jsx";
 import TeacherClosScreen from "./screens/teacher/TeacherClosScreen.jsx";
+import TeacherAssessmentScreen from "./screens/teacher/TeacherAssessmentScreen.jsx";
+import TeacherAssignmentsScreen from "./screens/teacher/TeacherAssignmentsScreen.jsx";
+import TeacherQuizzesScreen from "./screens/teacher/TeacherQuizzesScreen.jsx";
+import TeacherCloPloMappingScreen from "./screens/teacher/TeacherCloPloMappingScreen.jsx";
 import WeeklyContentScreen from "./screens/teacher/WeeklyContentScreen.jsx";
 import TeacherPlaceholderScreen from "./screens/teacher/TeacherPlaceholderScreen.jsx";
 import TeacherSubmitFoldersScreen from "./screens/teacher/TeacherSubmitFoldersScreen.jsx";
@@ -154,6 +158,22 @@ const App = () => {
         <Route
           path="course/:offeredCourseId/clos"
           element={<TeacherClosScreen />}
+        />
+        <Route
+          path="course/:offeredCourseId/assessment"
+          element={<TeacherAssessmentScreen />}
+        />
+        <Route
+          path="course/:offeredCourseId/assignments"
+          element={<TeacherAssignmentsScreen />}
+        />
+        <Route
+          path="course/:offeredCourseId/quizzes"
+          element={<TeacherQuizzesScreen />}
+        />
+        <Route
+          path="course/:offeredCourseId/clo-plo"
+          element={<TeacherCloPloMappingScreen />}
         />
         <Route
           path="course/:offeredCourseId/folder"

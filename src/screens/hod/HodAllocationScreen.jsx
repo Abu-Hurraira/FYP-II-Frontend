@@ -84,12 +84,20 @@ export default function HodAllocationScreen() {
     const key = String(offeredCourseId);
     setRows((prev) => {
       const current = normalizeAllocationRow(prev[key]);
+      const nextVal = !current[permissionKey];
+      const updated = {
+        ...current,
+        [permissionKey]: nextVal,
+      };
+
+      // When CLOs is ticked, automatically check CLO-PLO Map and Task-CLO Map as well
+      if (permissionKey === "clos" && nextVal) {
+        updated.cloPloMapping = true;
+        updated.cloTaskMapping = true;
+      }
       return {
         ...prev,
-        [key]: {
-          ...current,
-          [permissionKey]: !current[permissionKey],
-        },
+        [key]: updated,
       };
     });
   };

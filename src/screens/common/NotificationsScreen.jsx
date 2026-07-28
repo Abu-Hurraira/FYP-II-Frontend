@@ -60,8 +60,20 @@ export default function NotificationsScreen({
       }
     }
 
-    const type = String(notification.type || "").toLowerCase();
-    if (cloApprovalPath && (type === "clopendingapproval" || type.includes("clo"))) {
+    const type = String(notification.notificationType || notification.type || "").toLowerCase();
+    const title = String(notification.notificationTitle || notification.title || "").toLowerCase();
+
+    if (
+      cloApprovalPath &&
+      (type.includes("clo") ||
+        type.includes("content") ||
+        type.includes("approval") ||
+        type.includes("pending") ||
+        title.includes("approval") ||
+        title.includes("pending") ||
+        title.includes("clo") ||
+        title.includes("mapping"))
+    ) {
       navigate(cloApprovalPath);
     }
   };
