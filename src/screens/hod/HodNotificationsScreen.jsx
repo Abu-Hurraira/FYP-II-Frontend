@@ -5,7 +5,7 @@ export default function HodNotificationsScreen() {
   return (
     <NotificationsScreen
       title="Notifications"
-      emptyText="No notifications yet. Pending CLO uploads will appear here."
+      emptyText="No notifications yet. CLO, weekly content, and mapping approvals will appear here."
       cloApprovalPath="/hod/clo-approvals"
     />
   );

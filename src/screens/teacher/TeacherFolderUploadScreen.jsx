@@ -1,12 +1,15 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { deleteCourseFolderFile, getCourseFolderOverview, getFolderFiles, uploadFileToCourseFolder } from "../../api/teacherApi";
+import { deleteCourseFolderFile, downloadTeacherFile, getCourseFolderOverview, getFolderFiles, uploadFileToCourseFolder } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
+import { HodRejectionBanner, useHodRejectionAlert } from "../../components/HodRejectionNotice.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
-import { stripFolderTemplatePrefix } from "../../utils/helpers";
+import { folderDisplayName, getAuthUserId } from "../../utils/helpers";
 import { isSubmitFolderLocked, resolveTeacherFolderStatus } from "../../utils/weeklyProgressHelpers";
+import FcarGeneratorView from "../../components/FcarGeneratorView.jsx";
 import theme from "../../styles/theme";
+
 
 export default function TeacherFolderUploadScreen() {
   const { user } = useContext(AuthContext);
@@ -22,9 +25,10 @@ export default function TeacherFolderUploadScreen() {
     rejectionReason,
   } = location.state || {};
 
-  const teacherUserId = stateT != null ? stateT : user?.userId;
+  const teacherUserId = stateT != null ? stateT : getAuthUserId(user);
   const [courseStatus, setCourseStatus] = useState(folderSubmissionStatus ?? null);
   const [statusLoading, setStatusLoading] = useState(Boolean(offeredCourseId));
+  const [liveRejectionReason, setLiveRejectionReason] = useState(rejectionReason || "");
 
   useEffect(() => {
     if (!offeredCourseId) {
@@ -36,6 +40,8 @@ export default function TeacherFolderUploadScreen() {
       .then((overview) => {
         if (!cancelled) {
           setCourseStatus(resolveTeacherFolderStatus(overview, folderSubmissionStatus));
+          const reason = overview?.rejectionReason ?? overview?.RejectionReason ?? "";
+          if (reason) setLiveRejectionReason(reason);
         }
       })
       .catch(() => {})
@@ -49,12 +55,16 @@ export default function TeacherFolderUploadScreen() {
 
   const statusLabel = resolveTeacherFolderStatus(courseStatus, folderSubmissionStatus);
   const readOnly = isSubmitFolderLocked(statusLabel) || Boolean(isLocked);
+  useHodRejectionAlert(
+    String(statusLabel).toLowerCase() === "rejected",
+    "course folder",
+    liveRejectionReason,
+    !statusLoading
+  );
 
   const [files, setFiles] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(
-    folder?.allowedFileCategories?.[0] || "Other"
-  );
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedByCategory, setSelectedByCategory] = useState({});
+  const [uploadingCategory, setUploadingCategory] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadFiles = useCallback(async () => {
@@ -63,25 +73,28 @@ export default function TeacherFolderUploadScreen() {
       return;
     }
     try {
-      const result = await getFolderFiles(folder.directoryId);
-      setFiles(result);
+      const result = await getFolderFiles(folder.directoryId, offeredCourseId);
+      setFiles(Array.isArray(result) ? result : []);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
     }
-  }, [folder?.directoryId]);
+  }, [folder?.directoryId, offeredCourseId]);
 
   useEffect(() => {
     loadFiles();
   }, [loadFiles]);
 
-  const filteredFiles = useMemo(() => {
-    return files.filter((file) => {
-      const category = file.fileCategory ?? file.FileCategory ?? "";
-      return category === selectedCategory;
-    });
-  }, [files, selectedCategory]);
+  const filesByCategory = useMemo(() => {
+    const grouped = {};
+    for (const file of files) {
+      const category = file.fileCategory ?? file.FileCategory ?? "Other";
+      if (!grouped[category]) grouped[category] = [];
+      grouped[category].push(file);
+    }
+    return grouped;
+  }, [files]);
 
   if (!folder) {
     return (
@@ -97,36 +110,47 @@ export default function TeacherFolderUploadScreen() {
     );
   }
 
-  const pickFile = (e) => {
+  const pickFile = (category, e) => {
     if (readOnly) {
       showAlert("Locked", "This folder is locked and cannot be changed.");
       return;
     }
     const f = e.target.files?.[0];
-    if (f) setSelectedFile(f);
+    e.target.value = "";
+    if (!f) return;
+    setSelectedByCategory((prev) => ({ ...prev, [category]: f }));
   };
 
-  const upload = async () => {
+  const upload = async (category) => {
     if (readOnly) {
       showAlert("Locked", "This folder is locked and cannot be changed.");
       return;
     }
+    const selectedFile = selectedByCategory[category];
     if (!selectedFile) {
       showAlert("Select file", "Please select a file first.");
       return;
     }
+    if (!teacherUserId) {
+      showAlert("Error", "Unable to upload. Missing user. Try logging in again.");
+      return;
+    }
     try {
+      setUploadingCategory(category);
       const result = await uploadFileToCourseFolder(
         folder.directoryId,
         teacherUserId,
-        selectedCategory,
-        selectedFile
+        category,
+        selectedFile,
+        offeredCourseId
       );
       showAlert("Uploaded", result.message);
-      setSelectedFile(null);
+      setSelectedByCategory((prev) => ({ ...prev, [category]: null }));
       loadFiles();
     } catch (error) {
       showAlert("Error", error.message);
+    } finally {
+      setUploadingCategory(null);
     }
   };
 
@@ -137,14 +161,14 @@ export default function TeacherFolderUploadScreen() {
     }
     if (!(await showConfirm("Delete File", "Are you sure?"))) return;
     try {
-      await deleteCourseFolderFile(fileId);
+      await deleteCourseFolderFile(fileId, offeredCourseId);
       loadFiles();
     } catch (error) {
       showAlert("Error", error.message);
     }
   };
 
-  const categories = folder.allowedFileCategories ?? [];
+  const categories = folder.allowedFileCategories ?? folder.AllowedFileCategories ?? [];
 
   return (
     <div className="relative min-h-full bg-page">
@@ -152,7 +176,7 @@ export default function TeacherFolderUploadScreen() {
         <PageBackButton className="mt-0.5" />
         <div className="min-w-0 flex-1 text-center sm:text-left">
           <h1 className="text-xl font-semibold text-gray-900">
-            {stripFolderTemplatePrefix(folder.directoryName)}
+            {folderDisplayName(folder)}
           </h1>
           {courseTitle && <p className="mt-0.5 text-xs text-gray-500">{courseTitle}</p>}
         </div>
@@ -169,57 +193,22 @@ export default function TeacherFolderUploadScreen() {
             Folder locked — course submission approved by HOD (view only)
           </p>
         )}
-        {statusLabel === "Rejected" && rejectionReason && (
-          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-red-800">
-            HOD feedback: {rejectionReason}
-          </p>
-        )}
+        {statusLabel === "Rejected" ? (
+          <HodRejectionBanner title="course folder" reason={liveRejectionReason} />
+        ) : null}
         {readOnly && !statusLabel && (
           <p className="mt-3 text-center font-extrabold text-emerald-700">This folder is locked.</p>
         )}
 
-        <div className="mt-6 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm">
-          <p className="mb-2 font-extrabold text-gray-900">File Category</p>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => {
-                  setSelectedCategory(category);
-                  setSelectedFile(null);
-                }}
-                className={`rounded-full px-4 py-2 text-sm ${
-                  selectedCategory === category
-                    ? "bg-brand font-extrabold text-white"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {!readOnly && !statusLoading && (
-          <div className="mt-4 rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm">
-            <label className="block cursor-pointer rounded-lg bg-gray-100 p-3 text-gray-600">
-              <input type="file" className="hidden" onChange={pickFile} />
-              {selectedFile?.name || "Choose file"}
-            </label>
-            <button
-              type="button"
-              onClick={upload}
-              className="mt-3 w-full app-btn-primary app-btn-primary-block rounded-2xl py-3 font-extrabold"
-            >
-              Upload File
-            </button>
+        {((folder?.templateCode ?? folder?.TemplateCode ?? "").toLowerCase() === "o"
+          || folderDisplayName(folder).toLowerCase().includes("fcar")) && (
+          <div className="mt-4 mb-6">
+            <FcarGeneratorView
+              offeredCourseId={offeredCourseId}
+              teacherUserId={teacherUserId}
+            />
           </div>
         )}
-
-        <h2 className="mt-6 text-sm font-semibold text-gray-900">
-          Uploaded files — {selectedCategory}
-        </h2>
 
         {loading ? (
           <div className="flex justify-center py-10">
@@ -229,32 +218,81 @@ export default function TeacherFolderUploadScreen() {
             />
           </div>
         ) : (
-          <div className="mt-3 flex flex-col gap-3">
-            {filteredFiles.map((file) => (
-              <div
-                key={file.fileId ?? file.FileId}
-                className="flex items-center rounded-2xl border border-gray-100 bg-white shadow-card p-3 shadow-sm"
-              >
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-900">{file.fileName ?? file.FileName}</p>
-                  <p className="text-sm text-gray-500">{file.fileCategory ?? file.FileCategory}</p>
-                </div>
-                {!readOnly && !statusLoading && (
-                  <button
-                    type="button"
-                    onClick={() => deleteFile(file.fileId ?? file.FileId)}
-                    className="font-extrabold text-red-600"
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            ))}
-            {filteredFiles.length === 0 && (
-              <p className="py-8 text-center text-gray-500">
-                No files uploaded for {selectedCategory} yet.
-              </p>
-            )}
+          <div className="mt-6 flex flex-col gap-8">
+            {(categories.length > 0 ? categories : ["Other"]).map((category) => {
+              const categoryFiles = filesByCategory[category] ?? [];
+              const selectedFile = selectedByCategory[category];
+              return (
+                <section key={category} className="rounded-2xl border border-gray-100 bg-white shadow-card p-4 shadow-sm">
+                  <h2 className="text-base font-extrabold text-gray-900">{category}</h2>
+
+                  {!readOnly && !statusLoading && (
+                    <div className="mt-3">
+                      <label className="block cursor-pointer rounded-lg bg-gray-100 p-3 text-gray-600">
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => pickFile(category, e)}
+                        />
+                        {selectedFile?.name || "Choose any file to upload"}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => upload(category)}
+                        disabled={uploadingCategory === category}
+                        className="mt-3 w-full app-btn-primary app-btn-primary-block rounded-2xl py-3 font-extrabold disabled:opacity-60"
+                      >
+                        {uploadingCategory === category ? "Uploading…" : "Upload File"}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex flex-col gap-3">
+                    {categoryFiles.map((file) => (
+                      <div
+                        key={file.fileId ?? file.FileId}
+                        className="flex items-center rounded-xl border border-gray-100 bg-gray-50 p-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {file.fileName ?? file.FileName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              downloadTeacherFile(
+                                file.fileId ?? file.FileId,
+                                offeredCourseId,
+                                file.fileName ?? file.FileName
+                              ).catch((err) => showAlert("Download failed", err.message))
+                            }
+                            className="text-sm font-extrabold text-brand"
+                          >
+                            Download
+                          </button>
+                          {!readOnly && !statusLoading && (
+                            <button
+                              type="button"
+                              onClick={() => deleteFile(file.fileId ?? file.FileId)}
+                              className="font-extrabold text-red-600"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {categoryFiles.length === 0 && (
+                      <p className="py-4 text-center text-sm text-gray-500">
+                        No files uploaded for {category} yet.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
       </div>

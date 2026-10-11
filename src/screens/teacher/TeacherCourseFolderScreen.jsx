@@ -2,15 +2,18 @@ import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   createMasterFolder,
+  createCustomFolder,
   getCourseFolderOverview,
+  importMainFolderDataToSubmittedFolder,
   submitCourseFolder,
   validateCourseFolder,
 } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
+import { HodRejectionBanner, useHodRejectionAlert } from "../../components/HodRejectionNotice.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import theme from "../../styles/theme";
-import { stripFolderTemplatePrefix } from "../../utils/helpers";
+import { folderDisplayName } from "../../utils/helpers";
 import { isSubmitFolderLocked, resolveTeacherFolderStatus } from "../../utils/weeklyProgressHelpers";
 
 export default function TeacherCourseFolderScreen() {
@@ -27,6 +30,9 @@ export default function TeacherCourseFolderScreen() {
   const knownStatus = location.state?.folderStatus ?? null;
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [customName, setCustomName] = useState("");
+  const [creatingCustom, setCreatingCustom] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -86,6 +92,61 @@ export default function TeacherCourseFolderScreen() {
     }
   };
 
+  const handleCreateCustom = async () => {
+    const name = customName.trim();
+    if (!name) {
+      showAlert("Validation Error", "Enter a folder name.");
+      return;
+    }
+    try {
+      setCreatingCustom(true);
+      const result = await createCustomFolder(offeredCourseId, teacherUserId, name);
+      setOverview(result);
+      setCustomName("");
+      showAlert("Created", `Folder "${name}" added.`);
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setCreatingCustom(false);
+    }
+  };
+
+  const handleImportMainData = async () => {
+    if (
+      !(await showConfirm(
+        "Import main-folder data",
+        "Copy all saved main-folder data into these submitted folders as PDFs? You can download each file afterwards."
+      ))
+    ) {
+      return;
+    }
+    try {
+      setPublishing(true);
+      const result = await importMainFolderDataToSubmittedFolder(offeredCourseId, teacherUserId);
+      const count = result?.importedCount ?? result?.ImportedCount ?? 0;
+      showAlert(
+        "Imported",
+        result?.message ||
+          `Saved main-folder data was copied into the submitted folders as PDFs (${count} item(s)).`
+      );
+      await loadOverview();
+    } catch (error) {
+      showAlert("Import failed", error.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const folderStatus = resolveTeacherFolderStatus(overview, knownStatus);
+  const courseReadOnly = isSubmitFolderLocked(folderStatus);
+  const showSubmit = Boolean(overview?.isCreated && !courseReadOnly);
+  const rejectionReason = overview?.rejectionReason ?? overview?.RejectionReason ?? "";
+  useHodRejectionAlert(
+    Boolean(overview) && String(folderStatus).toLowerCase() === "rejected",
+    "course folder",
+    rejectionReason
+  );
+
   if (loading && !overview) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -96,11 +157,6 @@ export default function TeacherCourseFolderScreen() {
       </div>
     );
   }
-
-  const folderStatus = resolveTeacherFolderStatus(overview, knownStatus);
-  const courseReadOnly = isSubmitFolderLocked(folderStatus);
-  const showSubmit = overview?.isCreated && !courseReadOnly;
-  const rejectionReason = overview?.rejectionReason ?? overview?.RejectionReason ?? "";
 
   return (
     <div className="relative min-h-full bg-page">
@@ -149,17 +205,39 @@ export default function TeacherCourseFolderScreen() {
           )}
 
           {folderStatus === "Rejected" && (
-            <div className="mb-4 rounded-xl bg-red-100 p-4 text-center">
-              <p className="font-extrabold text-red-800">Rejected — please revise and resubmit</p>
-              {rejectionReason ? (
-                <p className="mt-2 text-sm text-red-900">{rejectionReason}</p>
-              ) : (
-                <p className="mt-1 text-sm text-red-800">Update your files and submit again.</p>
-              )}
-            </div>
+            <HodRejectionBanner title="course folder" reason={rejectionReason} />
           )}
 
-          {overview.folders.map((folder) => {
+          {!courseReadOnly ? (
+            <div className="mb-4 space-y-3">
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold"
+                  placeholder="Custom folder name"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={creatingCustom}
+                  onClick={handleCreateCustom}
+                  className="rounded-xl bg-[#15803d] px-4 py-2 text-sm font-extrabold text-white disabled:opacity-50"
+                >
+                  {creatingCustom ? "Adding…" : "Add folder"}
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={publishing}
+                onClick={handleImportMainData}
+                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-extrabold text-indigo-900 hover:bg-indigo-100 disabled:opacity-50"
+              >
+                {publishing ? "Importing…" : "Import saved main-folder data as PDFs"}
+              </button>
+            </div>
+          ) : null}
+
+          {(overview.folders ?? overview.Folders ?? []).map((folder) => {
             const folderLocked = courseReadOnly;
 
             return (
@@ -179,11 +257,15 @@ export default function TeacherCourseFolderScreen() {
                     },
                   })
                 }
-                className="mb-2.5 flex w-full min-h-[48px] items-center rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
+                className={`mb-2.5 flex w-full min-h-[48px] items-center rounded-2xl border px-4 py-3 text-left shadow-card shadow-sm transition ${
+                  folderStatus === "Approved"
+                    ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70"
+                    : "border-gray-100 bg-white hover:bg-brand-muted/40"
+                }`}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">
-                    {stripFolderTemplatePrefix(folder.directoryName)}
+                    {folderDisplayName(folder)}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">
                     {folder.fileCount} file(s)

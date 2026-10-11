@@ -1,4 +1,4 @@
-import request, { API_BASE_URL } from "./apiClient";
+import request from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
 import { getSessionsByProgram } from "./sessionsApi";
 import { getSectionsBySession } from "./sectionsApi";
@@ -80,20 +80,47 @@ export const importStudentsBySection = async (sectionId, file) => {
   const formData = new FormData();
   appendFormFile(formData, "file", file, "students.xlsx");
 
-  const response = await fetch(
-    `${API_BASE_URL}/Students/import-section/${sectionId}`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to import students.");
-  }
-
-  return data;
+  return await request(`/Students/import-section/${sectionId}`, {
+    method: "POST",
+    body: formData,
+    timeoutMs: 120000,
+  });
 };
+
+export async function getEnrollmentBySession(sessionId) {
+  return await request(`/Students/enrollment/by-session/${sessionId}`);
+}
+
+export async function enrollStudentInOfferedCourse(payload) {
+  return await request("/Students/enroll", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addStudentEnrollment(studentId, offeredCourseId) {
+  return await request(`/Students/${studentId}/enrollments`, {
+    method: "POST",
+    body: JSON.stringify({ offeredCourseId }),
+  });
+}
+
+export async function removeStudentEnrollment(studentId, offeredCourseId) {
+  return await request(`/Students/${studentId}/enrollments/${offeredCourseId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getStudentsByOfferedCourse(offeredCourseId) {
+  return await request(`/Students/by-offered-course/${offeredCourseId}`);
+}
+
+export async function importEnrollmentBySession(sessionId, file) {
+  const formData = new FormData();
+  appendFormFile(formData, "file", file, "enrollment.xlsx");
+  return await request(`/Students/import-enrollment/${sessionId}`, {
+    method: "POST",
+    body: formData,
+    timeoutMs: 120000,
+  });
+}

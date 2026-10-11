@@ -1,4 +1,5 @@
 import {
+  asList,
   getTemplateAllocationType,
   isSubmissionUploadFolder,
   isTemplateFolderDirectory,
@@ -31,31 +32,88 @@ export function canAccessWeeklyContent(offeredCourseId, config) {
   return canTeacherUpload(offeredCourseId, "clos", config);
 }
 
+function flagValue(permissions, keys) {
+  if (!permissions) return false;
+  if (!(permissions.configured ?? permissions.Configured)) {
+    return false;
+  }
+  for (const key of keys) {
+    if (permissions[key] != null) return Boolean(permissions[key]);
+  }
+  return false;
+}
+
 /** Whether this teacher may add/upload weekly content (CLO allocation). */
 export function canUploadWeeklyContentFromPermissions(permissions) {
-  if (!permissions) return false;
-  return Boolean(permissions.clos ?? permissions.Clos);
+  return flagValue(permissions, ["clos", "Clos", "folderTemplate", "FolderTemplate"]);
 }
 
 /** Whether this teacher may add/upload CLOs (HOD Clos allocation). */
 export function canManageClosFromPermissions(permissions) {
-  if (!permissions) return false;
-  const clos = Boolean(permissions.clos ?? permissions.Clos);
-  // When HOD allocation is configured, only the Clos-flagged teacher manages drafts.
-  if (permissions.configured ?? permissions.Configured) {
-    return clos;
-  }
-  // Allocation not set up yet — allow CLO authoring during early setup.
-  return clos;
+  return flagValue(permissions, ["clos", "Clos"]);
 }
 
-/** Other teachers may only see HOD-approved CLOs. */
+export function canManageCloPloFromPermissions(permissions) {
+  return flagValue(permissions, ["cloPloMapping", "CloPloMapping", "clos", "Clos"]);
+}
+
+export function canManageCloTaskFromPermissions(permissions) {
+  return flagValue(permissions, ["cloTaskMapping", "CloTaskMapping", "clos", "Clos"]);
+}
+
+export function canManageMidFromPermissions(permissions) {
+  return flagValue(permissions, ["mid", "Mid"]);
+}
+
+export function canManageFinalFromPermissions(permissions) {
+  return flagValue(permissions, ["final", "Final"]);
+}
+
+/** Normalize API ContentStatus / ApprovalStatus for teacher CLO UI. */
+export function getCloApprovalStatus(item) {
+  const raw = String(
+    item?.approvalStatus ??
+      item?.ApprovalStatus ??
+      item?.contentStatus ??
+      item?.ContentStatus ??
+      "Draft"
+  ).toLowerCase();
+  if (raw === "pendingreview" || raw === "pending") return "pending";
+  if (raw === "approved") return "approved";
+  if (raw === "rejected") return "rejected";
+  return "draft";
+}
+
+/** Other teachers may only see HOD-approved CLOs unless they are the allocated teacher. */
 export function isApprovedClo(item) {
-  return String(item?.approvalStatus ?? item?.ApprovalStatus ?? "").toLowerCase() === "approved";
+  return getCloApprovalStatus(item) === "approved";
 }
 
-export function filterClosForViewer(items, canManage) {
-  const list = items || [];
-  if (canManage) return list;
+export function filterClosForViewer(items, canManage, isAllocatedTeacher = false) {
+  const list = asList(items);
+  if (canManage || isAllocatedTeacher) return list;
   return list.filter(isApprovedClo);
+}
+
+export function pickContentTypeStatusRow(statuses, contentTypeCode) {
+  const list = Array.isArray(statuses)
+    ? statuses
+    : Array.isArray(statuses?.$values)
+      ? statuses.$values
+      : [];
+  return (
+    list.find(
+      (item) => String(item?.contentTypeCode ?? item?.ContentTypeCode ?? "") === contentTypeCode
+    ) || null
+  );
+}
+
+export function pickContentTypeStatus(statuses, contentTypeCode, fallback = "Draft") {
+  const row = pickContentTypeStatusRow(statuses, contentTypeCode);
+  return row?.contentStatus ?? row?.ContentStatus ?? fallback;
+}
+
+export function pickHodFeedback(statuses, contentTypeCode) {
+  const row = pickContentTypeStatusRow(statuses, contentTypeCode);
+  return String(row?.hodFeedback ?? row?.HodFeedback ?? "").trim();
 }

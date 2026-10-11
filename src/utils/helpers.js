@@ -1,3 +1,15 @@
+/** Unwrap API list payloads (`[]`, `{ items }`, `{ $values }`, etc.). */
+export function asList(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+  if (Array.isArray(data.$values)) return data.$values;
+  if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.Items)) return data.Items;
+  if (Array.isArray(data.value)) return data.value;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
+}
+
 /** Normalize user object from API / localStorage (camelCase + PascalCase). */
 export function normalizeAuthUser(user) {
   if (!user) return null;
@@ -98,4 +110,13 @@ export function stripFolderTemplatePrefix(name) {
   return String(name || "")
     .replace(/^[a-z]-\s*/i, "")
     .trim();
+}
+
+export function folderDisplayName(folder) {
+  const named = folder?.folderItemName ?? folder?.FolderItemName;
+  if (named) {
+    return String(named).trim();
+  }
+
+  return stripFolderTemplatePrefix(folder?.directoryName ?? folder?.DirectoryName);
 }

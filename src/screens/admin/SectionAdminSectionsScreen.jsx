@@ -24,19 +24,30 @@ const SectionAdminSectionsScreen = () => {
   const { sessionId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { session } = location.state || {};
+  const { session: stateSession, program } = location.state || {};
+  const session = stateSession && String(stateSession.sessionId ?? stateSession.SessionId) === String(sessionId)
+    ? stateSession
+    : { sessionId: Number(sessionId), programId: program?.programId };
 
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const valid = session && String(session.sessionId) === String(sessionId);
-
   const loadSections = async () => {
-    if (!valid) return;
+    const sid = Number(sessionId);
+    if (!sid) return;
     try {
       setLoading(true);
-      const data = await getSectionsBySession(session.sessionId);
-      setSections(data || []);
+      const data = await getSectionsBySession(sid);
+      setSections(
+        (data || []).map((item) => ({
+          ...item,
+          sectionId: item.sectionId ?? item.SectionId,
+          sectionName: item.sectionName ?? item.SectionName ?? "",
+          sessionId: item.sessionId ?? item.SessionId ?? sid,
+          semester: item.semester ?? item.Semester,
+          studentCount: item.studentCount ?? item.StudentCount ?? 0,
+        }))
+      );
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -46,24 +57,7 @@ const SectionAdminSectionsScreen = () => {
 
   useEffect(() => {
     loadSections();
-  }, [valid, sessionId]);
-
-  if (!valid) {
-    return (
-      <div className="min-h-full bg-page">
-        <div className="flex flex-wrap items-start gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-          <PageBackButton className="mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-gray-900">Sections</h1>
-            <p className="mt-0.5 text-xs text-gray-500">Session missing. Open from the sessions list.</p>
-            <button type="button" className="mt-4 text-sm font-semibold text-brand" onClick={() => navigate("/section-admin")}>
-              Programs
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  }, [sessionId]);
 
   return (
     <div className="min-h-full bg-page">
@@ -73,6 +67,22 @@ const SectionAdminSectionsScreen = () => {
           <h1 className="text-xl font-semibold text-gray-900">Sections</h1>
           <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "SectionAdmin"}</p>
         </div>
+        <button
+          type="button"
+          onClick={() =>
+            navigate("/admin/enrollment", {
+              state: {
+                programId: session.programId ?? program?.programId,
+                sessionId: session.sessionId,
+                session,
+                program,
+              },
+            })
+          }
+          className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40"
+        >
+          Course enrollment
+        </button>
       </div>
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
@@ -87,7 +97,7 @@ const SectionAdminSectionsScreen = () => {
                 key={item.sectionId}
                 type="button"
                 onClick={() =>
-                  navigate("/section-admin/students", {
+                  navigate("/admin/students", {
                     state: { section: item },
                   })
                 }

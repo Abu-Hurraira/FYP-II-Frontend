@@ -12,6 +12,7 @@ import {
   getArchiveId,
   isOldOutcome,
 } from "../../utils/outcomeArchivedView";
+import { listOutcomeCatalogVersions, applyOutcomeCatalog } from "../../api/outcomeCatalogApi";
 
 const PLO_MAX_COUNT = 12;
 
@@ -62,6 +63,10 @@ const OutcomeScreen = ({
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [catalogModalVisible, setCatalogModalVisible] = useState(false);
+  const [catalogVersions, setCatalogVersions] = useState([]);
+  const [selectedCatalogVersionId, setSelectedCatalogVersionId] = useState("");
+  const [restoringCatalog, setRestoringCatalog] = useState(false);
 
   const isPLO = type === "PLO";
   const targetProgramId = Number(programId || program?.programId);
@@ -94,16 +99,65 @@ const OutcomeScreen = ({
 
     try {
       setLoading(true);
-      const result = await restoreAllByProgram(targetProgramId);
-      await loadItems({ includeArchived: false });
-      showAlert(
-        "Restored from database",
-        `${formatRestoreSummary(result, type)} Default ${type}s loaded into database successfully.`
+      const versions = await listOutcomeCatalogVersions(type);
+      const list = Array.isArray(versions) ? versions : [];
+      const forProgram = list.filter(
+        (v) => Number(v.sourceProgramId ?? v.SourceProgramId) === Number(targetProgramId)
       );
+      const candidates = forProgram.length ? forProgram : list;
+
+      if (!candidates.length) {
+        showAlert(
+          "No catalog",
+          `No saved ${type} catalog version found. Import an Excel file once to create a version.`
+        );
+        return;
+      }
+
+      if (candidates.length === 1) {
+        const result = await applyOutcomeCatalog(
+          type,
+          targetProgramId,
+          candidates[0].outcomeCatalogVersionId ?? candidates[0].OutcomeCatalogVersionId
+        );
+        await loadItems({ includeArchived: false });
+        showAlert(
+          "Restored from database",
+          `${formatRestoreSummary(result, type)} Default ${type}s loaded into database successfully.`
+        );
+        return;
+      }
+
+      setCatalogVersions(candidates);
+      setSelectedCatalogVersionId(
+        String(candidates[0].outcomeCatalogVersionId ?? candidates[0].OutcomeCatalogVersionId)
+      );
+      setCatalogModalVisible(true);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApplySelectedCatalog = async () => {
+    if (!selectedCatalogVersionId) {
+      showAlert("Validation", "Select a catalog version.");
+      return;
+    }
+    try {
+      setRestoringCatalog(true);
+      const result = await applyOutcomeCatalog(type, targetProgramId, selectedCatalogVersionId);
+      setCatalogModalVisible(false);
+      await loadItems({ includeArchived: false });
+      showAlert(
+        "Restored from database",
+        `${formatRestoreSummary(result, type)} Applied version "${result.versionLabel || selectedCatalogVersionId}".`
+      );
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setRestoringCatalog(false);
     }
   };
 
@@ -182,12 +236,12 @@ const OutcomeScreen = ({
         await createItem(
           isPLO
             ? {
-                programId: program.programId,
+                programId: targetProgramId,
                 ploCode: nextCode,
                 ploDescription: description.trim(),
               }
             : {
-                programId: program.programId,
+                programId: targetProgramId,
                 peoCode: nextCode,
                 peoDescription: description.trim(),
               }
@@ -215,7 +269,7 @@ const OutcomeScreen = ({
         )
       : await showConfirm(
           `Delete ${type}`,
-          `Move this ${type} to old versions? It will be hidden until you load from database.`
+          `Delete this ${type}? You can restore from a previous Excel catalog via “Load from database” if one was imported.`
         );
 
     if (!confirmed) return;
@@ -251,11 +305,11 @@ const OutcomeScreen = ({
 
     try {
       setUploading(true);
-      const result = await importItems(program.programId, selectedFile);
+      const result = await importItems(targetProgramId, selectedFile);
 
       showAlert(
         "Import Completed",
-        `Inserted: ${result.insertedCount}\nSkipped: ${result.skippedCount || 0}\nErrors: ${result.errorCount || 0}`
+        `Inserted: ${result.insertedCount ?? result.InsertedCount ?? result.inserted ?? result.Inserted ?? 0}\nSkipped: ${result.skippedCount ?? result.SkippedCount ?? result.skipped ?? result.Skipped ?? 0}\nErrors: ${result.errorCount ?? result.ErrorCount ?? 0}`
       );
 
       setUploadModalVisible(false);
@@ -386,7 +440,7 @@ const OutcomeScreen = ({
             <label className="text-sm font-extrabold text-gray-700">{editingItem ? `Edit ${type}` : `Enter ${type}`}</label>
             <textarea
               className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3"
-              placeholder="e.g The ability to think critically and perform scientific analysis."
+              placeholder="e.g. The ability to think critically and perform scientific analysis."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -410,7 +464,7 @@ const OutcomeScreen = ({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Upload New {type}s file</h2>
             <label className="flex h-11 cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600">
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={pickFile} />
+              <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               {selectedFile ? selectedFile.name : "Browse"}
             </label>
             <button
@@ -423,6 +477,59 @@ const OutcomeScreen = ({
               {uploading ? "…" : "Upload"}
             </button>
             <button type="button" onClick={() => setUploadModalVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {catalogModalVisible && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          onClick={() => setCatalogModalVisible(false)}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            <h2 className="mb-2 text-lg font-semibold text-gray-900">Choose {type} catalog version</h2>
+            <p className="mb-4 text-sm text-gray-500">Multiple saved Excel catalogs found. Pick which one to apply.</p>
+            <select
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              value={selectedCatalogVersionId}
+              onChange={(e) => setSelectedCatalogVersionId(e.target.value)}
+            >
+              {catalogVersions.map((v) => {
+                const id = v.outcomeCatalogVersionId ?? v.OutcomeCatalogVersionId;
+                const label =
+                  v.versionLabel ??
+                  v.VersionLabel ??
+                  `Version ${id}`;
+                const created = v.createdAt ?? v.CreatedAt;
+                return (
+                  <option key={id} value={String(id)}>
+                    {label}
+                    {created ? ` · ${new Date(created).toLocaleDateString()}` : ""}
+                  </option>
+                );
+              })}
+            </select>
+            <button
+              type="button"
+              onClick={handleApplySelectedCatalog}
+              disabled={restoringCatalog}
+              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              style={{ backgroundColor: theme.colors.primaryDark }}
+            >
+              {restoringCatalog ? "Applying…" : "Apply catalog"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCatalogModalVisible(false)}
+              className="mt-3 w-full font-bold text-gray-500"
+            >
               Cancel
             </button>
           </div>

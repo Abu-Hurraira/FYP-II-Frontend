@@ -2,13 +2,18 @@ import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserNotifications, markAllNotificationsRead, markNotificationRead } from "../../api/notificationsApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import PageBackButton from "../../components/PageBackButton.jsx";
 import theme from "../../styles/theme";
 import { showAlert } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
 
 function formatDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const raw = String(value).trim();
+  const normalized = /T/.test(raw) || /Z$/i.test(raw) || /[+-]\d\d:\d\d$/.test(raw)
+    ? raw
+    : raw.replace(" ", "T");
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleString();
 }
@@ -25,35 +30,48 @@ export default function NotificationsScreen({
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (options = {}) => {
+    const silent = options.silent === true;
     if (!userId) {
       setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await getUserNotifications(userId);
       setNotifications(data || []);
     } catch (error) {
-      showAlert("Error", error.message);
+      if (!silent) showAlert("Error", error.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
     loadNotifications();
+    const timer = window.setInterval(() => {
+      loadNotifications({ silent: true });
+    }, 20000);
+    return () => window.clearInterval(timer);
   }, [loadNotifications]);
 
   const handleOpen = async (notification) => {
-    if (!notification.isRead) {
+    const notificationId = notification.notificationId ?? notification.NotificationId;
+    if (!notification.isRead && notificationId > 0) {
       try {
-        await markNotificationRead(notification.notificationId);
+        await markNotificationRead(notificationId);
+        const relatedId = notification.relatedId ?? notification.RelatedId;
+        const type = String(notification.type || notification.notificationType || "");
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.notificationId === notification.notificationId ? { ...n, isRead: true } : n
-          )
+          prev.map((n) => {
+            const sameId = n.notificationId === notificationId;
+            const sameRelated =
+              relatedId != null &&
+              n.relatedId === relatedId &&
+              String(n.type || "") === type;
+            return sameId || sameRelated ? { ...n, isRead: true } : n;
+          })
         );
       } catch (error) {
         showAlert("Error", error.message);
@@ -66,11 +84,15 @@ export default function NotificationsScreen({
     if (
       cloApprovalPath &&
       (type.includes("clo") ||
+        type.includes("weekly") ||
         type.includes("content") ||
+        type.includes("mapping") ||
+        type.includes("folder") ||
         type.includes("approval") ||
         type.includes("pending") ||
         title.includes("approval") ||
         title.includes("pending") ||
+        title.includes("weekly") ||
         title.includes("clo") ||
         title.includes("mapping"))
     ) {
@@ -93,12 +115,15 @@ export default function NotificationsScreen({
   return (
     <div className="min-h-full bg-page">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {user?.fullName || user?.name || "User"}
-            {unreadCount > 0 ? ` · ${unreadCount} unread` : ""}
-          </p>
+        <div className="flex min-w-0 items-center gap-3">
+          <PageBackButton className="mt-0.5 shrink-0" />
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+            <p className="mt-0.5 text-sm text-gray-500">
+              {user?.fullName || user?.name || "User"}
+              {unreadCount > 0 ? ` · ${unreadCount} unread` : ""}
+            </p>
+          </div>
         </div>
         {unreadCount > 0 ? (
           <button
@@ -125,19 +150,37 @@ export default function NotificationsScreen({
           <div className="space-y-2.5">
             {notifications.map((item) => (
               <button
-                key={item.notificationId}
+                key={`${item.type || "n"}-${item.relatedId ?? item.notificationId}`}
                 type="button"
                 onClick={() => handleOpen(item)}
-                className={`w-full rounded-lg border px-4 py-3 text-left shadow-sm transition ${
+                className={`relative w-full rounded-lg border px-4 py-3 pl-8 text-left shadow-sm transition ${
                   item.isRead
                     ? "border-gray-200 bg-white"
-                    : "border-brand/30 bg-brand-light/40"
+                    : "border-red-200 bg-red-50"
                 }`}
               >
+                {!item.isRead ? (
+                  <span
+                    className="absolute left-3 top-4 h-2.5 w-2.5 rounded-full bg-red-500"
+                    aria-hidden
+                  />
+                ) : (
+                  <span
+                    className="absolute left-3 top-4 h-2.5 w-2.5 rounded-full bg-gray-300"
+                    aria-hidden
+                  />
+                )}
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold text-gray-900">{item.title || "Notification"}</p>
+                  <div className="min-w-0">
+                    {item.typeLabel || item.type ? (
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-600">
+                        {item.typeLabel || item.type}
+                      </p>
+                    ) : null}
+                    <p className="text-sm font-semibold text-gray-900">{item.title || "Notification"}</p>
+                  </div>
                   {!item.isRead ? (
-                    <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
                       New
                     </span>
                   ) : null}

@@ -32,7 +32,14 @@ export function normalizeWeeklyContent(data) {
     courseTitle: data.courseTitle ?? data.CourseTitle,
     sectionName: data.sectionName ?? data.SectionName,
     teacherName: data.teacherName ?? data.TeacherName,
+    contentStatuses: data.contentStatuses ?? data.ContentStatuses ?? [],
     weeks: weeksFromWeeklyContent(data).map(normalizeTopicNode),
+    siblingSections: (data.siblingSections ?? data.SiblingSections ?? []).map((s) => ({
+      offeredCourseId: s.offeredCourseId ?? s.OfferedCourseId,
+      sectionName: s.sectionName ?? s.SectionName ?? "",
+      programCode: s.programCode ?? s.ProgramCode ?? "",
+      programName: s.programName ?? s.ProgramName ?? "",
+    })),
   };
 }
 
@@ -102,6 +109,29 @@ export function groupOfferedCoursesBySubject(offeredList) {
     }
   }
   return groups;
+}
+
+/** Other sections of the same subject assigned to this teacher. */
+export function findTeacherSiblingSections(courses, offeredCourseId) {
+  const list = Array.isArray(courses) ? courses : [];
+  const current = list.find((c) => Number(c.offeredCourseId) === Number(offeredCourseId));
+  if (!current) return [];
+
+  const courseId = Number(current.courseId) || 0;
+  const title = String(current.courseTitle || "").trim().toLowerCase();
+
+  return list
+    .filter((c) => {
+      if (Number(c.offeredCourseId) === Number(offeredCourseId)) return false;
+      if (courseId && Number(c.courseId) === courseId) return true;
+      return Boolean(title && String(c.courseTitle || "").trim().toLowerCase() === title);
+    })
+    .map((c) => ({
+      offeredCourseId: Number(c.offeredCourseId),
+      sectionName: c.sectionName || "",
+      programCode: c.programCode || "",
+      programName: c.programName || "",
+    }));
 }
 
 export function subjectKeyForCourse(course) {

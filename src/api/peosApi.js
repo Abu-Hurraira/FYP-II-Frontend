@@ -1,54 +1,61 @@
-import request, { API_BASE_URL } from "./apiClient";
+import request from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
+import { applyLatestOutcomeCatalog } from "./outcomeCatalogApi";
 
-export const getPEOsByProgram = async (programId, { includeArchived = false } = {}) => {
-  const query = includeArchived ? "?includeArchived=true" : "";
-  return await request(`/PEOs/by-program/${programId}${query}`);
+function normalizePeo(raw) {
+  if (!raw || typeof raw !== "object") return raw;
+  return {
+    peoId: raw.peoId ?? raw.PeoId ?? raw.peoid,
+    programId: raw.programId ?? raw.ProgramId,
+    peoCode: raw.peoCode ?? raw.PeoCode ?? raw.peocode ?? "",
+    peoDescription: raw.peoDescription ?? raw.PeoDescription ?? raw.peodescription ?? "",
+    outcomeStatus: raw.outcomeStatus ?? raw.OutcomeStatus ?? "New",
+  };
+}
+
+export const getPEOsByProgram = async (programId) => {
+  const data = await request(`/PEOs/by-program/${programId}`);
+  return (Array.isArray(data) ? data : []).map(normalizePeo);
 };
 
 export const createPEO = async (peo) => {
   return await request("/PEOs", {
     method: "POST",
-    body: JSON.stringify(peo),
+    body: JSON.stringify({
+      programId: peo.programId,
+      peoCode: peo.peoCode,
+      peoDescription: peo.peoDescription,
+    }),
   });
 };
 
-export const updatePEO = async (peoId, peo, { archiveId } = {}) => {
-  const path = archiveId != null ? `/PEOs/archive/${archiveId}` : `/PEOs/${peoId}`;
-  return await request(path, {
+export const updatePEO = async (peoId, peo) => {
+  return await request(`/PEOs/${peoId}`, {
     method: "PUT",
-    body: JSON.stringify(peo),
+    body: JSON.stringify({
+      peoCode: peo.peoCode,
+      peoDescription: peo.peoDescription,
+    }),
   });
 };
 
-export const deletePEO = async (peoId, { archiveId } = {}) => {
-  const path = archiveId != null ? `/PEOs/archive/${archiveId}` : `/PEOs/${peoId}`;
-  return await request(path, {
+export const deletePEO = async (peoId) => {
+  return await request(`/PEOs/${peoId}`, {
     method: "DELETE",
   });
 };
 
 export const restorePEOsByProgram = async (programId) => {
-  return await request(`/PEOs/restore-by-program/${programId}`, {
-    method: "POST",
-  });
+  return await applyLatestOutcomeCatalog("PEO", programId);
 };
 
 export const importPEOs = async (programId, file) => {
   const formData = new FormData();
   appendFormFile(formData, "file", file, "peos.xlsx");
 
-  const response = await fetch(`${API_BASE_URL}/PEOs/import/${programId}`, {
+  return await request(`/PEOs/import/${programId}`, {
     method: "POST",
     body: formData,
+    timeoutMs: 120000,
   });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to import PEOs.");
-  }
-
-  return data;
 };

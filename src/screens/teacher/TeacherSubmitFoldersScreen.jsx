@@ -77,7 +77,11 @@ export default function TeacherSubmitFoldersScreen() {
                     { state: { folderStatus: status } }
                   )
                 }
-                className="flex min-h-[48px] items-center rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
+                className={`flex min-h-[48px] items-center rounded-2xl border px-4 py-3 text-left shadow-card shadow-sm transition ${
+                  status === "Approved"
+                    ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70"
+                    : "border-gray-100 bg-white hover:bg-brand-muted/40"
+                }`}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">

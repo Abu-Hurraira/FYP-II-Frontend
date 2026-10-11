@@ -50,7 +50,7 @@ export default function TeacherLayout() {
             <SidebarIconDashboard />
             Dashboard
           </NavLink>
-          <NavLink to="/teacher/placeholder?title=Attendance" className={sidebarNavClass}>
+          <NavLink to="/teacher/attendance" className={sidebarNavClass}>
             <SidebarIconAttendance />
             Attendance
           </NavLink>

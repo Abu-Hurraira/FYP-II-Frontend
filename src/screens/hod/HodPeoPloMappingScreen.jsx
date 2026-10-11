@@ -7,7 +7,13 @@ import { showAlert } from "../../utils/dialogs";
 import { extractOutcomeNumber, ploDisplayLabel, sortPeos, sortPlos } from "../../utils/outcomeHelpers";
 import { getPEOsByProgram } from "../../api/peosApi";
 import { getPLOsByProgram } from "../../api/plosApi";
-import { loadPeoPloMapping, savePeoPloMapping } from "../../utils/peoPloMappingStorage";
+import {
+  getPeoPloMatrix,
+  matrixFromPeoPloApi,
+  peoPloMatrixToCells,
+  savePeoPloMatrix,
+} from "../../api/peoPloMappingApi";
+import { getAuthUserId } from "../../utils/helpers";
 
 function peoDisplayLabel(peo, fallbackIndex = 0) {
   const n = extractOutcomeNumber(peo?.peoCode);
@@ -44,14 +50,15 @@ export default function HodPeoPloMappingScreen() {
   const { programId } = useParams();
   const location = useLocation();
   const program = location.state?.program;
-
-  const valid = program && String(program.programId) === String(programId);
+  const targetProgramId = Number(programId || program?.programId);
+  const valid = Boolean(targetProgramId && !Number.isNaN(targetProgramId));
 
   const [peos, setPeos] = useState([]);
   const [plos, setPlos] = useState([]);
   const [matrix, setMatrix] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [programName, setProgramName] = useState(program?.programName || "");
 
   const [hoverTip, setHoverTip] = useState(null);
 
@@ -68,15 +75,19 @@ export default function HodPeoPloMappingScreen() {
     (async () => {
       try {
         setLoading(true);
-        const [peoData, ploData] = await Promise.all([
-          getPEOsByProgram(program.programId),
-          getPLOsByProgram(program.programId),
+        const [peoData, ploData, apiMatrix] = await Promise.all([
+          getPEOsByProgram(targetProgramId),
+          getPLOsByProgram(targetProgramId),
+          getPeoPloMatrix(targetProgramId),
         ]);
 
         if (!mounted) return;
         setPeos(peoData || []);
         setPlos(ploData || []);
-        setMatrix(loadPeoPloMapping(program.programId));
+        setMatrix(matrixFromPeoPloApi(apiMatrix));
+        setProgramName(
+          apiMatrix?.programName ?? apiMatrix?.ProgramName ?? program?.programName ?? ""
+        );
       } catch (error) {
         showAlert("Error", error.message);
       } finally {
@@ -87,7 +98,7 @@ export default function HodPeoPloMappingScreen() {
     return () => {
       mounted = false;
     };
-  }, [valid, program?.programId]);
+  }, [valid, targetProgramId]);
 
   const updateCell = (peoId, ploId, mapped) => {
     setMatrix((prev) => {
@@ -121,8 +132,14 @@ export default function HodPeoPloMappingScreen() {
     [matrix]
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!valid) return;
+
+    const hodUserId = getAuthUserId(user);
+    if (!hodUserId) {
+      showAlert("Error", "HOD user not found. Please sign in again.");
+      return;
+    }
 
     if (mappedCount === 0) {
       showAlert(
@@ -134,8 +151,14 @@ export default function HodPeoPloMappingScreen() {
 
     try {
       setSaving(true);
-      savePeoPloMapping(program.programId, matrix);
-      showAlert("Saved", `PEO–PLO mapping saved successfully (${mappedCount} mapping${mappedCount === 1 ? "" : "s"}).`);
+      await savePeoPloMatrix(targetProgramId, {
+        mappedByUserId: hodUserId,
+        cells: peoPloMatrixToCells(matrix),
+      });
+      showAlert(
+        "Saved",
+        `PEO–PLO mapping saved to database (${mappedCount} mapping${mappedCount === 1 ? "" : "s"}).`
+      );
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -164,7 +187,7 @@ export default function HodPeoPloMappingScreen() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold text-gray-900">PEOs, PLOs Mapping</h1>
           <p className="mt-0.5 text-xs text-gray-500">
-            {program.programName} · {user?.roleName || "HOD"}
+            {programName || program?.programName || `Program #${targetProgramId}`} · {user?.roleName || "HOD"}
           </p>
         </div>
         <button

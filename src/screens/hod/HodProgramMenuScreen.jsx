@@ -46,6 +46,16 @@ const HodProgramMenuScreen = () => {
           <button
             type="button"
             onClick={() =>
+              navigate(`/hod/program/${program.programId}/courses`, { state: { program } })
+            }
+            className="flex min-h-[48px] w-full items-center justify-between rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left text-sm font-semibold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-brand-muted/40"
+          >
+            <span>Course catalog</span>
+            <span className="text-lg text-gray-300">›</span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
               navigate(`/hod/program/${program.programId}/sessions`, { state: { program } })
             }
             className="flex min-h-[48px] w-full items-center justify-between rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left text-sm font-semibold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-brand-muted/40"

@@ -1,17 +1,34 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getCLOsByProgramCourse } from "../../api/closApi";
 import { getOfferedCourseUploadPermissions } from "../../api/hodUploadAllocationApi";
 import {
   addWeeklyTopic,
+  applyWeeklyLoadScheme,
+  getTeacherCourses,
   getWeeklyContentShared,
-  loadWeeklyContentFromDatabase,
+  getWeeklyLoadSchemes,
+  getWeeklyLoadSchemeTopics,
+  submitContentForReview,
   updateTopicProgress,
   uploadWeeklyContentFile,
 } from "../../api/teacherApi";
+import { findTeacherSiblingSections } from "../../utils/weeklyContentSharing";
+import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
-import { showAlert } from "../../utils/dialogs";
-import { canUploadWeeklyContentFromPermissions } from "../../utils/uploadAllocationHelpers";
+import AppSelect from "../../components/AppSelect.jsx";
+import { showAlert, showConfirm } from "../../utils/dialogs";
+import { asList, getAuthUserId } from "../../utils/helpers";
+import { sortClos } from "../../utils/outcomeHelpers";
+import {
+  canManageClosFromPermissions,
+  canUploadWeeklyContentFromPermissions,
+  filterClosForViewer,
+  pickContentTypeStatus,
+  pickHodFeedback,
+} from "../../utils/uploadAllocationHelpers";
+import { HodRejectionBanner, useHodRejectionAlert } from "../../components/HodRejectionNotice.jsx";
 
 /** Leaf topics use their own flag; parents are covered only when every nested sub-topic is covered. */
 function isTopicFullyCovered(topic) {
@@ -23,39 +40,96 @@ function isTopicFullyCovered(topic) {
 }
 
 export default function WeeklyContentScreen() {
+  const { user } = useContext(AuthContext);
   const { offeredCourseId: oc } = useParams();
   const offeredCourseId = Number(oc);
   const [searchParams] = useSearchParams();
-  const teacherUserId = Number(searchParams.get("teacherUserId")) || undefined;
+  const routeTeacher = searchParams.get("teacherUserId");
+  const teacherUserId =
+    routeTeacher != null && routeTeacher !== ""
+      ? Number(routeTeacher) || getAuthUserId(user)
+      : getAuthUserId(user);
 
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [uploadPermissions, setUploadPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const canUploadWeeklyContent = canUploadWeeklyContentFromPermissions(uploadPermissions);
+  const canManageClos = canManageClosFromPermissions(uploadPermissions);
+  const isAllocatedTeacher = Boolean(
+    uploadPermissions?.isAllocatedTeacher ?? uploadPermissions?.IsAllocatedTeacher
+  );
   const [actionModal, setActionModal] = useState(false);
   const [addModal, setAddModal] = useState(false);
   const [uploadModal, setUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [weekNo, setWeekNo] = useState("");
   const [topicTitle, setTopicTitle] = useState("");
-  const [cloCodes, setCloCodes] = useState("");
+  const [cloCodes, setCloCodes] = useState([]);
+  const [courseClos, setCourseClos] = useState([]);
   const [subTopicModal, setSubTopicModal] = useState(false);
   const [subTopicContext, setSubTopicContext] = useState(null);
   const [subTopicTitle, setSubTopicTitle] = useState("");
-  const [subTopicCloCodes, setSubTopicCloCodes] = useState("");
+  const [subTopicCloCodes, setSubTopicCloCodes] = useState([]);
+  const [isSubmittingWeekly, setIsSubmittingWeekly] = useState(false);
+  const [applyModal, setApplyModal] = useState(null);
+  const [selectedSiblingIds, setSelectedSiblingIds] = useState([]);
+  const [isApplyingTopic, setIsApplyingTopic] = useState(false);
+  const [siblingSections, setSiblingSections] = useState([]);
+  const [loadSchemeModal, setLoadSchemeModal] = useState(false);
+  const [loadSchemes, setLoadSchemes] = useState([]);
+  const [loadSchemesLoading, setLoadSchemesLoading] = useState(false);
+  const [selectedLoadScheme, setSelectedLoadScheme] = useState(null);
+  const [loadTopics, setLoadTopics] = useState([]);
+  const [loadTopicsLoading, setLoadTopicsLoading] = useState(false);
+  const [selectedTopicIds, setSelectedTopicIds] = useState([]);
+  const [isApplyingLoadScheme, setIsApplyingLoadScheme] = useState(false);
+  const uploadedCloOptions = useMemo(() => {
+    const list = filterClosForViewer(courseClos, canManageClos, isAllocatedTeacher)
+      .map((item) => ({
+        cloId: item.cloId ?? item.CloId,
+        cloCode: String(item.cloCode ?? item.CloCode ?? "").trim(),
+        cloDescription: String(item.cloDescription ?? item.CloDescription ?? "").trim(),
+      }))
+      .filter((item) => item.cloCode);
+    return sortClos(list);
+  }, [courseClos, canManageClos, isAllocatedTeacher]);
+  const programCourseId = data?.programCourseId ?? data?.ProgramCourseId;
+  const weeklyStatus = pickContentTypeStatus(data?.contentStatuses ?? data?.ContentStatuses, "WeeklyContent");
+  const weeklyPending = String(weeklyStatus).toLowerCase() === "pendingreview";
+  const weeklyRejected = String(weeklyStatus).toLowerCase() === "rejected";
+  const weeklyRejectReason = pickHodFeedback(data?.contentStatuses ?? data?.ContentStatuses, "WeeklyContent");
+  useHodRejectionAlert(weeklyRejected, "Weekly content", weeklyRejectReason, !loading);
 
   const loadData = async () => {
     try {
-      const [result, permissions] = await Promise.all([
-        getWeeklyContentShared(offeredCourseId),
-        getOfferedCourseUploadPermissions(offeredCourseId).catch(() => ({
-          clos: true,
+      const [result, permissions, courses] = await Promise.all([
+        getWeeklyContentShared(offeredCourseId, teacherUserId),
+        getOfferedCourseUploadPermissions(offeredCourseId, teacherUserId).catch(() => ({
+          clos: false,
+          folderTemplate: false,
           configured: false,
         })),
+        teacherUserId
+          ? getTeacherCourses(teacherUserId).catch(() => [])
+          : Promise.resolve([]),
       ]);
+      const fromApi = result?.siblingSections ?? [];
+      const fromCourses = findTeacherSiblingSections(courses, offeredCourseId);
+      setSiblingSections(fromApi.length > 0 ? fromApi : fromCourses);
       setData(result);
       setUploadPermissions(permissions);
+
+      const pcId = result?.programCourseId ?? result?.ProgramCourseId;
+      if (pcId && teacherUserId) {
+        const clos = await getCLOsByProgramCourse(pcId, {
+          offeredCourseId,
+          teacherUserId,
+        }).catch(() => []);
+        setCourseClos(asList(clos));
+      } else {
+        setCourseClos([]);
+      }
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -67,6 +141,31 @@ export default function WeeklyContentScreen() {
     loadData();
   }, [offeredCourseId]);
 
+  const applyTopicProgress = async (topic, isCompleted, alsoOfferedCourseIds = []) => {
+    try {
+      setIsApplyingTopic(true);
+      const extraIds = (alsoOfferedCourseIds || []).filter(
+        (id) => Number(id) > 0 && Number(id) !== Number(offeredCourseId)
+      );
+      const result = await updateTopicProgress(
+        offeredCourseId,
+        topic.topicId,
+        teacherUserId,
+        isCompleted,
+        extraIds
+      );
+      for (const extraId of extraIds) {
+        await updateTopicProgress(extraId, topic.topicId, teacherUserId, isCompleted, []);
+      }
+      setData(result);
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setIsApplyingTopic(false);
+      setApplyModal(null);
+    }
+  };
+
   const handleToggleTopic = async (topic) => {
     const hasChildren = (topic.children?.length ?? 0) > 0;
     if (hasChildren) {
@@ -76,27 +175,121 @@ export default function WeeklyContentScreen() {
       );
       return;
     }
+    if (isApplyingTopic) return;
 
+    const nextCompleted = !topic.isCompleted;
+    if (siblingSections.length > 0) {
+      setSelectedSiblingIds(siblingSections.map((s) => Number(s.offeredCourseId)));
+      setApplyModal({ topic, nextCompleted });
+      return;
+    }
+
+    await applyTopicProgress(topic, nextCompleted);
+  };
+
+  const siblingLabel = (section) => {
+    const program = section.programCode || section.programName;
+    return program ? `${program} · ${section.sectionName}` : section.sectionName;
+  };
+
+  const closeLoadSchemeModal = () => {
+    setLoadSchemeModal(false);
+    setLoadSchemes([]);
+    setSelectedLoadScheme(null);
+    setLoadTopics([]);
+    setSelectedTopicIds([]);
+  };
+
+  const openLoadSchemeModal = async () => {
+    setActionModal(false);
+    setLoadSchemeModal(true);
+    setSelectedLoadScheme(null);
+    setLoadTopics([]);
+    setSelectedTopicIds([]);
+    setLoadSchemesLoading(true);
     try {
-      const result = await updateTopicProgress(
-        offeredCourseId,
-        topic.topicId,
-        teacherUserId,
-        !topic.isCompleted
-      );
-      setData(result);
+      const schemes = asList(await getWeeklyLoadSchemes(offeredCourseId, teacherUserId));
+      setLoadSchemes(schemes);
     } catch (error) {
       showAlert("Error", error.message);
+      setLoadSchemeModal(false);
+    } finally {
+      setLoadSchemesLoading(false);
     }
   };
 
-  const handleLoadFromDatabase = async () => {
+  const handleSelectLoadScheme = async (scheme) => {
+    const sourceSessionId = Number(scheme.sessionId ?? scheme.SessionId);
+    if (!sourceSessionId) return;
+    setSelectedLoadScheme(scheme);
+    setLoadTopicsLoading(true);
+    setLoadTopics([]);
+    setSelectedTopicIds([]);
     try {
-      setActionModal(false);
-      const result = await loadWeeklyContentFromDatabase(offeredCourseId);
-      setData(result);
+      const detail = await getWeeklyLoadSchemeTopics(
+        offeredCourseId,
+        sourceSessionId,
+        teacherUserId
+      );
+      const items = asList(detail?.items ?? detail?.Items);
+      setLoadTopics(items);
+      setSelectedTopicIds(
+        items
+          .map((t) => Number(t.topicId ?? t.TopicId))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      );
     } catch (error) {
       showAlert("Error", error.message);
+      setSelectedLoadScheme(null);
+    } finally {
+      setLoadTopicsLoading(false);
+    }
+  };
+
+  const toggleTopicSelection = (topicId) => {
+    const id = Number(topicId);
+    setSelectedTopicIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleApplyLoadScheme = async () => {
+    const sourceSessionId = Number(
+      selectedLoadScheme?.sessionId ?? selectedLoadScheme?.SessionId
+    );
+    if (!sourceSessionId) {
+      showAlert("Validation", "Select a previous scheme first.");
+      return;
+    }
+    if (selectedTopicIds.length === 0) {
+      showAlert("Validation", "Select at least one topic to load.");
+      return;
+    }
+    try {
+      setIsApplyingLoadScheme(true);
+      const result = await applyWeeklyLoadScheme(offeredCourseId, {
+        teacherUserId,
+        sourceSessionId,
+        topicIds: selectedTopicIds,
+      });
+      const hasWeeks =
+        Array.isArray(result?.weeks) || Array.isArray(result?.Weeks);
+      if (hasWeeks) {
+        setData(result);
+      } else {
+        await loadData();
+      }
+      showAlert(
+        "Loaded",
+        result?.message ||
+          result?.Message ||
+          `Loaded ${result?.createdCount ?? result?.CreatedCount ?? selectedTopicIds.length} topic(s) from previous scheme.`
+      );
+      setIsApplyingLoadScheme(false);
+      closeLoadSchemeModal();
+    } catch (error) {
+      showAlert("Error", error.message);
+      setIsApplyingLoadScheme(false);
     }
   };
 
@@ -114,7 +307,7 @@ export default function WeeklyContentScreen() {
         teacherUserId,
         weekNo: Number(weekNo),
         topicTitle: topicTitle.trim(),
-        cloCodes: cloCodes.split(",").map((x) => x.trim()).filter(Boolean),
+        cloCodes,
         displayOrder: rootMax + 1,
       };
       const result = await addWeeklyTopic(offeredCourseId, payload);
@@ -122,7 +315,7 @@ export default function WeeklyContentScreen() {
       setAddModal(false);
       setWeekNo("");
       setTopicTitle("");
-      setCloCodes("");
+      setCloCodes([]);
     } catch (error) {
       showAlert("Error", error.message);
     }
@@ -135,7 +328,7 @@ export default function WeeklyContentScreen() {
     }
     setSubTopicContext({ parentTopicId, weekNo: weekNum, parentTitle });
     setSubTopicTitle("");
-    setSubTopicCloCodes("");
+    setSubTopicCloCodes([]);
     setSubTopicModal(true);
   };
 
@@ -164,7 +357,7 @@ export default function WeeklyContentScreen() {
         weekNo: Number(subTopicContext.weekNo),
         parentTopicId,
         topicTitle: subTopicTitle.trim(),
-        cloCodes: subTopicCloCodes.split(",").map((x) => x.trim()).filter(Boolean),
+        cloCodes: subTopicCloCodes,
         displayOrder: sibMax + 1,
       };
       const result = await addWeeklyTopic(offeredCourseId, payload);
@@ -172,7 +365,7 @@ export default function WeeklyContentScreen() {
       setSubTopicModal(false);
       setSubTopicContext(null);
       setSubTopicTitle("");
-      setSubTopicCloCodes("");
+      setSubTopicCloCodes([]);
       requestAnimationFrame(() => {
         const el =
           document.getElementById(`topic-children-${parentTopicId}`) ||
@@ -186,12 +379,65 @@ export default function WeeklyContentScreen() {
 
   const pickFile = (e) => {
     const f = e.target.files?.[0];
-    if (f) setSelectedFile(f);
+    if (!f) return;
+    if (!f.name?.toLowerCase().endsWith(".xlsx")) {
+      showAlert("Invalid File", "Please select a .xlsx file.");
+      e.target.value = "";
+      return;
+    }
+    setSelectedFile(f);
+  };
+
+  const handleSubmitWeeklyForReview = async () => {
+    if (!canUploadWeeklyContent) {
+      showAlert("Permission Denied", "Only teachers authorized by HOD can submit weekly content.");
+      return;
+    }
+    if (!programCourseId || !teacherUserId) {
+      showAlert("Error", "Unable to submit weekly content. Missing course or user. Try logging in again.");
+      return;
+    }
+    if (!(data?.weeks?.length > 0)) {
+      showAlert("Nothing to upload", "Add weekly topics first, then upload for HOD approval.");
+      return;
+    }
+    if (weeklyPending) {
+      showAlert("Already submitted", "Weekly content is already awaiting HOD review.");
+      return;
+    }
+
+    const confirmed = await showConfirm(
+      "Upload for HOD approval",
+      "Submit weekly content to HOD? The HOD will see it on the Notifications page with a red unread marker."
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsSubmittingWeekly(true);
+      await submitContentForReview(programCourseId, {
+        teacherUserId,
+        offeredCourseId,
+        contentTypeCode: "WeeklyContent",
+      });
+      showAlert(
+        "Submitted",
+        "Weekly content submitted to HOD for approval. You will be notified after review."
+      );
+      await loadData();
+    } catch (error) {
+      showAlert("Upload failed", error.message || "Could not submit weekly content.");
+    } finally {
+      setIsSubmittingWeekly(false);
+    }
   };
 
   const handleUploadFile = async () => {
     if (!selectedFile) {
       showAlert("File", "Please select a .xlsx file.");
+      return;
+    }
+    if (!teacherUserId) {
+      showAlert("Error", "Unable to upload. Missing user. Try logging in again.");
       return;
     }
     try {
@@ -230,6 +476,21 @@ export default function WeeklyContentScreen() {
             {canUploadWeeklyContent && (
               <AddHeaderButton label="Add Content" onClick={() => setActionModal(true)} />
             )}
+            {canUploadWeeklyContent && (
+              <button
+                type="button"
+                onClick={handleSubmitWeeklyForReview}
+                disabled={isSubmittingWeekly || weeklyPending}
+                className="app-btn-primary h-9 shrink-0 rounded-lg px-3 text-sm disabled:opacity-50"
+                title={
+                  weeklyPending
+                    ? "Already awaiting HOD review"
+                    : "Submit weekly content for HOD approval"
+                }
+              >
+                {isSubmittingWeekly ? "Uploading…" : weeklyPending ? "Awaiting HOD" : "Upload for HOD"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() =>
@@ -244,27 +505,52 @@ export default function WeeklyContentScreen() {
       </div>
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
+        {weeklyRejected ? <HodRejectionBanner title="weekly content" reason={weeklyRejectReason} /> : null}
+        {canUploadWeeklyContent && (
+          <p className="mb-4 rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
+            Add or import topics, then click <strong>Upload for HOD</strong>. HOD gets a notification
+            (red dot on the bell) for weekly content, separate from CLO or mapping approvals.
+            {weeklyPending ? " Status: awaiting HOD review." : ""}
+          </p>
+        )}
+        {!canUploadWeeklyContent && (
+          <p className="mb-4 text-sm text-gray-500">
+            View-only: topics are shared from the allocated section. Your coverage is tracked for this section only.
+          </p>
+        )}
         {data?.isSharedWeeklyContent && (
-          <div className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            Weekly content outline is shared from{" "}
-            <span className="font-semibold">
+          <p className="mb-4 text-sm text-gray-500">
+            Outline shared from{" "}
+            <span className="font-semibold text-gray-700">
               {data.sharedFromSectionName || "another section"}
-            </span>{" "}
-            of the same subject. Your progress is tracked separately for your section.
-          </div>
+            </span>
+            . Progress is tracked separately for your section.
+          </p>
+        )}
+        {siblingSections.length > 0 && (
+          <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            You also teach this subject in{" "}
+            <span className="font-semibold">
+              {siblingSections.map(siblingLabel).join(", ")}
+            </span>
+            . When you tick a topic, you can mark those sections from here — no need to open each one.
+          </p>
         )}
 
-        {data?.weeks?.map((week, index) => (
-          <TopicCard
-            key={week.topicId}
-            topic={week}
-            index={index}
-            canUpload={canUploadWeeklyContent}
-            onToggle={handleToggleTopic}
-            onAddSubTopic={openSubTopicModal}
-          />
-        ))}
-        {data?.weeks?.length === 0 && (
+        {data?.weeks?.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            {data.weeks.map((week, index) => (
+              <TopicCard
+                key={week.topicId}
+                topic={week}
+                index={index}
+                canUpload={canUploadWeeklyContent}
+                onToggle={handleToggleTopic}
+                onAddSubTopic={openSubTopicModal}
+              />
+            ))}
+          </div>
+        ) : (
           <div className="mt-16 text-center">
             <p className="text-gray-600">No weekly content uploaded yet.</p>
             {canUploadWeeklyContent ? (
@@ -306,7 +592,7 @@ export default function WeeklyContentScreen() {
             <button
               type="button"
               className="app-btn-primary app-btn-primary-block mb-3 rounded-md py-3 font-bold"
-              onClick={handleLoadFromDatabase}
+              onClick={openLoadSchemeModal}
             >
               Load from Database
             </button>
@@ -315,6 +601,9 @@ export default function WeeklyContentScreen() {
               className="app-btn-primary app-btn-primary-block rounded-md py-3 font-bold"
               onClick={() => {
                 setActionModal(false);
+                setWeekNo("");
+                setTopicTitle("");
+                setCloCodes([]);
                 setAddModal(true);
               }}
             >
@@ -352,11 +641,10 @@ export default function WeeklyContentScreen() {
               placeholder="e.g., Graph Algorithms"
             />
             <label className="mt-2 block text-sm font-bold">CLO Codes</label>
-            <input
-              className="mb-4 mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
-              value={cloCodes}
-              onChange={(e) => setCloCodes(e.target.value)}
-              placeholder="e.g., CLO1, CLO2"
+            <CloCodePicker
+              clos={uploadedCloOptions}
+              selectedCodes={cloCodes}
+              onChange={setCloCodes}
             />
             <button
               type="button"
@@ -402,11 +690,10 @@ export default function WeeklyContentScreen() {
               placeholder="e.g., Measurement errors"
             />
             <label className="mt-2 block text-sm font-bold">CLO codes (optional)</label>
-            <input
-              className="mb-4 mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
-              value={subTopicCloCodes}
-              onChange={(e) => setSubTopicCloCodes(e.target.value)}
-              placeholder="e.g., CLO1"
+            <CloCodePicker
+              clos={uploadedCloOptions}
+              selectedCodes={subTopicCloCodes}
+              onChange={setSubTopicCloCodes}
             />
             <button
               type="button"
@@ -415,6 +702,85 @@ export default function WeeklyContentScreen() {
             >
               Save sub-topic
             </button>
+          </div>
+        </ModalBackdrop>
+      )}
+
+      {applyModal && (
+        <ModalBackdrop
+          onClose={() => {
+            if (!isApplyingTopic) setApplyModal(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex-1 text-center text-xl font-extrabold">
+                {applyModal.nextCompleted ? "Also mark other sections?" : "Also unmark other sections?"}
+              </h2>
+              <button
+                type="button"
+                className="text-2xl text-gray-500"
+                disabled={isApplyingTopic}
+                onClick={() => setApplyModal(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p className="mb-3 text-center text-sm text-gray-600">
+              <span className="font-semibold text-gray-800">{applyModal.topic.topicTitle}</span>
+              {" · "}
+              {applyModal.nextCompleted ? "Mark complete" : "Mark incomplete"} on this section
+              {data?.sectionName ? ` (${data.sectionName})` : ""}. Tick any other sections where you
+              taught the same topic.
+            </p>
+            <div className="mb-4 max-h-56 space-y-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
+              {siblingSections.map((section) => {
+                const id = Number(section.offeredCourseId);
+                const checked = selectedSiblingIds.includes(id);
+                return (
+                  <label
+                    key={id}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={isApplyingTopic}
+                      onChange={() => {
+                        setSelectedSiblingIds((prev) =>
+                          checked ? prev.filter((x) => x !== id) : [...prev, id]
+                        );
+                      }}
+                    />
+                    {siblingLabel(section)}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={isApplyingTopic}
+                onClick={() =>
+                  applyTopicProgress(applyModal.topic, applyModal.nextCompleted, selectedSiblingIds)
+                }
+                className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold disabled:opacity-50"
+              >
+                {isApplyingTopic
+                  ? "Saving…"
+                  : selectedSiblingIds.length > 0
+                    ? `Apply to this + ${selectedSiblingIds.length} section${selectedSiblingIds.length === 1 ? "" : "s"}`
+                    : "Apply to this section only"}
+              </button>
+              <button
+                type="button"
+                disabled={isApplyingTopic}
+                onClick={() => applyTopicProgress(applyModal.topic, applyModal.nextCompleted, [])}
+                className="w-full rounded-md border border-gray-200 bg-white py-3 text-sm font-extrabold text-gray-700 disabled:opacity-50"
+              >
+                This section only
+              </button>
+            </div>
           </div>
         </ModalBackdrop>
       )}
@@ -431,7 +797,7 @@ export default function WeeklyContentScreen() {
             <label className="text-sm font-bold">Upload weekly content file</label>
             <label className="mt-2 flex cursor-pointer items-center justify-between rounded-md bg-gray-100 px-3 py-3">
               <span className="truncate text-gray-600">{selectedFile?.name || "Select .xlsx file"}</span>
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={pickFile} />
+              <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               <span>⇧</span>
             </label>
             <button
@@ -444,6 +810,214 @@ export default function WeeklyContentScreen() {
           </div>
         </ModalBackdrop>
       )}
+
+      {loadSchemeModal && (
+        <ModalBackdrop
+          onClose={() => {
+            if (!isApplyingLoadScheme) closeLoadSchemeModal();
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="flex-1 text-center text-xl font-extrabold">
+                {selectedLoadScheme ? "Select topics" : "Load from previous scheme"}
+              </h2>
+              <button
+                type="button"
+                className="text-2xl text-gray-500"
+                disabled={isApplyingLoadScheme}
+                onClick={closeLoadSchemeModal}
+              >
+                ×
+              </button>
+            </div>
+
+            {!selectedLoadScheme ? (
+              <>
+                <p className="mb-3 text-center text-sm text-gray-500">
+                  Choose a previous scheme of study to copy weekly topics from.
+                </p>
+                {loadSchemesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
+                  </div>
+                ) : loadSchemes.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-gray-500">
+                    No previous schemes with weekly topics were found for this subject.
+                  </p>
+                ) : (
+                  <div className="mb-2 max-h-72 space-y-2 overflow-y-auto">
+                    {loadSchemes.map((scheme) => {
+                      const sid = Number(scheme.sessionId ?? scheme.SessionId);
+                      const label =
+                        scheme.schemeLabel ?? scheme.SchemeLabel ?? `Scheme ${sid}`;
+                      const year = scheme.academicYear ?? scheme.AcademicYear;
+                      const weekCount = scheme.weekCount ?? scheme.WeekCount;
+                      const topicCount = scheme.topicCount ?? scheme.TopicCount;
+                      return (
+                        <button
+                          key={sid}
+                          type="button"
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:border-brand hover:bg-brand-muted/20"
+                          onClick={() => handleSelectLoadScheme(scheme)}
+                        >
+                          <p className="text-sm font-bold text-gray-900">{label}</p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {year ? `${year} · ` : ""}
+                            {weekCount != null ? `${weekCount} week${weekCount === 1 ? "" : "s"}` : ""}
+                            {topicCount != null
+                              ? `${weekCount != null ? " · " : ""}${topicCount} topic${topicCount === 1 ? "" : "s"}`
+                              : ""}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-center text-sm text-gray-600">
+                  <span className="font-semibold text-gray-800">
+                    {selectedLoadScheme.schemeLabel ??
+                      selectedLoadScheme.SchemeLabel}
+                  </span>
+                  {" · "}
+                  Select root weeks to copy (sub-topics are included automatically).
+                </p>
+                <button
+                  type="button"
+                  className="mb-3 text-sm font-semibold text-brand hover:underline"
+                  disabled={isApplyingLoadScheme || loadTopicsLoading}
+                  onClick={() => {
+                    setSelectedLoadScheme(null);
+                    setLoadTopics([]);
+                    setSelectedTopicIds([]);
+                  }}
+                >
+                  ← Back to schemes
+                </button>
+                {loadTopicsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
+                  </div>
+                ) : loadTopics.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-gray-500">
+                    No root topics found in this scheme.
+                  </p>
+                ) : (
+                  <div className="mb-4 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    {loadTopics.map((topic) => {
+                      const tid = Number(topic.topicId ?? topic.TopicId);
+                      const weekNo = topic.weekNo ?? topic.WeekNo;
+                      const title = topic.topicTitle ?? topic.TopicTitle ?? "";
+                      const already = Boolean(
+                        topic.alreadyInCurrent ?? topic.AlreadyInCurrent
+                      );
+                      const checked = selectedTopicIds.includes(tid);
+                      return (
+                        <label
+                          key={tid}
+                          className={`flex cursor-pointer items-start gap-3 rounded-lg bg-white px-3 py-2 text-sm shadow-sm ${
+                            already ? "opacity-70" : ""
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={checked}
+                            disabled={isApplyingLoadScheme}
+                            onChange={() => toggleTopicSelection(tid)}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="font-semibold text-gray-900">
+                              Week{" "}
+                              {weekNo != null
+                                ? String(weekNo).padStart(2, "0")
+                                : "—"}{" "}
+                              — {title}
+                            </span>
+                            {already ? (
+                              <span className="mt-0.5 block text-xs text-amber-700">
+                                Already in current outline
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  disabled={
+                    isApplyingLoadScheme ||
+                    loadTopicsLoading ||
+                    selectedTopicIds.length === 0
+                  }
+                  onClick={handleApplyLoadScheme}
+                  className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold disabled:opacity-50"
+                >
+                  {isApplyingLoadScheme
+                    ? "Applying…"
+                    : `Load ${selectedTopicIds.length} topic${selectedTopicIds.length === 1 ? "" : "s"}`}
+                </button>
+              </>
+            )}
+          </div>
+        </ModalBackdrop>
+      )}
+    </div>
+  );
+}
+
+function CloCodePicker({ clos = [], selectedCodes = [], onChange }) {
+  const selected = Array.isArray(selectedCodes) ? selectedCodes : [];
+  const selectedSet = new Set(selected);
+
+  return (
+    <div className="mb-4">
+      <AppSelect
+        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+        value=""
+        emptyLabel="No CLOs uploaded yet"
+        onChange={(e) => {
+          const code = String(e.target.value || "").trim();
+          if (!code || selectedSet.has(code)) return;
+          onChange([...selected, code]);
+        }}
+      >
+        <option value="">
+          {clos.length ? "Select CLO code" : "No CLOs uploaded yet"}
+        </option>
+        {clos.map((item) => {
+          const code = item.cloCode;
+          const picked = selectedSet.has(code);
+          const desc = item.cloDescription ? ` — ${item.cloDescription.slice(0, 42)}` : "";
+          return (
+            <option key={item.cloId || code} value={code} disabled={picked}>
+              {code}
+              {desc}
+              {picked ? " (selected)" : ""}
+            </option>
+          );
+        })}
+      </AppSelect>
+      {selected.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selected.map((code) => (
+            <button
+              key={code}
+              type="button"
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800"
+              onClick={() => onChange(selected.filter((item) => item !== code))}
+            >
+              {code}
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -462,65 +1036,13 @@ function ModalBackdrop({ children, onClose }) {
   );
 }
 
-const WEEK_PALETTES = [
-  {
-    badgeBg: "bg-emerald-950/80 border-emerald-500/30 text-emerald-400",
-    visibleBadge: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-    btnStyle: "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10",
-    iconPath: "M12 11c0 3.5-3.5 6-3.5 6S5 14.5 5 11a7 7 0 1114 0c0 3.5-3.5 6-3.5 6S12 14.5 12 11z",
-  },
-  {
-    badgeBg: "bg-yellow-950/80 border-yellow-500/30 text-yellow-400",
-    visibleBadge: "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30",
-    btnStyle: "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10",
-    iconPath: "M8 7h8m0 0l-4-4m4 4l-4 4m0 6H8m0 0l4 4m-4-4l4-4",
-  },
-  {
-    badgeBg: "bg-amber-950/80 border-amber-500/30 text-amber-400",
-    visibleBadge: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-    btnStyle: "border-amber-500/40 text-amber-400 hover:bg-amber-500/10",
-    iconPath: "M13 10V3L4 14h7v7l9-11h-7z",
-  },
-  {
-    badgeBg: "bg-purple-950/80 border-purple-500/30 text-purple-400",
-    visibleBadge: "bg-purple-500/15 text-purple-400 border border-purple-500/30",
-    btnStyle: "border-purple-500/40 text-purple-400 hover:bg-purple-500/10",
-    iconPath: "M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 110 14 7 7 0 010-14z",
-  },
-  {
-    badgeBg: "bg-blue-950/80 border-blue-500/30 text-blue-400",
-    visibleBadge: "bg-blue-500/15 text-blue-400 border border-blue-500/30",
-    btnStyle: "border-blue-500/40 text-blue-400 hover:bg-blue-500/10",
-    iconPath: "M13 10V3L4 14h7v7l9-11h-7z",
-  },
-  {
-    badgeBg: "bg-cyan-950/80 border-cyan-500/30 text-cyan-400",
-    badgeText: "text-cyan-400",
-    visibleBadge: "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30",
-    btnStyle: "border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10",
-    iconPath: "M9 3v2m6-2v2M9 19v2m6-2v2M3 9h2m-2 6h2m14-6h2m-2 6h2M7 7h10v10H7z",
-  },
-  {
-    badgeBg: "bg-pink-950/80 border-pink-500/30 text-pink-400",
-    visibleBadge: "bg-pink-500/15 text-pink-400 border border-pink-500/30",
-    btnStyle: "border-pink-500/40 text-pink-400 hover:bg-pink-500/10",
-    iconPath: "M3 12h3l2-6 4 12 3-9 2 5h4",
-  },
-  {
-    badgeBg: "bg-lime-950/80 border-lime-500/30 text-lime-400",
-    visibleBadge: "bg-lime-500/15 text-lime-400 border border-lime-500/30",
-    btnStyle: "border-lime-500/40 text-lime-400 hover:bg-lime-500/10",
-    iconPath: "M12 2.25c-5.3 0-8.25 4.5-8.25 10.5 0 2.25 1.5 4.5 3 6l2.25-2.25v-3h6v3l2.25 2.25c1.5-1.5 3-3.75 3-6 0-6-2.95-10.5-8.25-10.5z",
-  },
-];
-
 function getTopicCoverageDetails(topic) {
   const children = topic.children ?? [];
   if (children.length === 0) {
     const isDone = Boolean(topic.isCompleted);
     return {
       status: isDone ? "complete" : "pending",
-      label: isDone ? "Complete" : "Not Complete",
+      label: isDone ? "Complete" : "Not complete",
       doneCount: isDone ? 1 : 0,
       totalCount: 1,
     };
@@ -532,152 +1054,78 @@ function getTopicCoverageDetails(topic) {
   function countLeaves(t) {
     const subs = t.children ?? [];
     if (subs.length === 0) {
-      totalCount++;
-      if (t.isCompleted) doneCount++;
+      totalCount += 1;
+      if (t.isCompleted) doneCount += 1;
     } else {
-      for (const s of subs) {
-        countLeaves(s);
-      }
+      for (const s of subs) countLeaves(s);
     }
   }
 
   countLeaves(topic);
 
-  let status = "pending";
-  let label = "Not Complete";
-
   if (doneCount === totalCount && totalCount > 0) {
-    status = "complete";
-    label = "Complete";
-  } else if (doneCount > 0) {
-    status = "partial";
-    label = `Partial (${doneCount}/${totalCount})`;
-  } else {
-    status = "pending";
-    label = "Not Complete";
+    return { status: "complete", label: "Complete", doneCount, totalCount };
   }
-
-  return { status, label, doneCount, totalCount };
+  if (doneCount > 0) {
+    return {
+      status: "partial",
+      label: `Partial (${doneCount}/${totalCount})`,
+      doneCount,
+      totalCount,
+    };
+  }
+  return { status: "pending", label: "Not complete", doneCount, totalCount };
 }
 
 function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic }) {
   const [expanded, setExpanded] = useState(false);
-
   const weekNo = topic.weekNo != null ? Number(topic.weekNo) : index + 1;
   const hasChildren = (topic.children?.length ?? 0) > 0;
   const subTopicCount = topic.children?.length ?? 0;
   const coverage = getTopicCoverageDetails(topic);
-
-  const palette = WEEK_PALETTES[index % WEEK_PALETTES.length];
-
-  const toggleWeekExpand = () => {
-    setExpanded((prev) => {
-      const next = !prev;
-      if (next) {
-        requestAnimationFrame(() => {
-          document.getElementById(`week-children-${topic.topicId}`)?.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
-        });
-      }
-      return next;
-    });
-  };
+  const rowTone =
+    subTopicCount === 0 || coverage.status === "pending"
+      ? "bg-white"
+      : coverage.status === "complete"
+        ? "bg-emerald-50"
+        : "bg-yellow-50";
 
   return (
-    <div className="mb-3.5 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm transition-all dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:hover:border-[#274347]">
-      <div className="flex flex-wrap items-center justify-between gap-3.5">
-        {/* Left Badge: 01 + Icon */}
-        <div className={`flex h-12 w-24 shrink-0 items-center justify-between rounded-xl border px-3 shadow-xs ${palette.badgeBg}`}>
-          <span className="text-base font-extrabold tracking-tight">
-            {String(weekNo).padStart(2, "0")}
-          </span>
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d={palette.iconPath} />
-          </svg>
-        </div>
+    <div className={`border-b border-gray-200 last:border-b-0 ${rowTone}`}>
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="min-w-0 flex-1 text-left">
+          <p className="text-sm font-semibold text-gray-900">
+            Week {String(weekNo).padStart(2, "0")} — {topic.topicTitle}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {subTopicCount} sub-topic{subTopicCount === 1 ? "" : "s"} · {coverage.label}
+          </p>
+        </button>
 
-        {/* Middle Topic Title & Details */}
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={toggleWeekExpand}
-            className="line-clamp-1 text-left text-sm font-bold text-gray-900 transition hover:text-emerald-500 dark:text-white dark:hover:text-emerald-400"
-          >
-            Week #{String(weekNo).padStart(2, "0")} — {topic.topicTitle}
-          </button>
-          <div className="mt-1 flex flex-wrap items-center gap-3.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
-            <span className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {subTopicCount} sub-topics
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Last updated: 12 May 2024
-            </span>
-          </div>
-        </div>
-
-        {/* Right Status & Controls */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          {/* Coverage Ratio Badge (e.g. 2/4) */}
-          <div
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold border ${
-              coverage.status === "complete"
-                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                : coverage.status === "partial"
-                  ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                  : "bg-rose-500/20 text-rose-400 border-rose-500/40"
-            }`}
-            title={`${coverage.doneCount} of ${coverage.totalCount} completed`}
-          >
-            <span>{coverage.doneCount}/{coverage.totalCount}</span>
-          </div>
-
-          {/* Hidden sub-topics hint */}
-          {!expanded && subTopicCount > 0 && (
-            <div className="hidden text-right text-xs text-gray-500 dark:text-gray-400 lg:block">
-              <div>{subTopicCount} sub-topics hidden</div>
-              <div className="text-[10px] text-gray-400 dark:text-gray-500">Tap the week title or &gt; to expand</div>
-            </div>
-          )}
-
-          {/* Add Sub-topic Button */}
-          {canUpload && (
+        <div className="flex shrink-0 items-center gap-2">
+          {canUpload ? (
             <button
               type="button"
               onClick={() => onAddSubTopic(topic.topicId, weekNo, topic.topicTitle)}
-              className={`flex items-center gap-1 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition ${palette.btnStyle}`}
+              className="text-xs font-semibold text-brand hover:underline"
             >
-              <span>Add sub-topic</span>
-              <span className="text-xs">&gt;</span>
+              Add sub-topic
             </button>
-          )}
-
-          {/* Chevron expand button */}
+          ) : null}
           <button
             type="button"
-            onClick={toggleWeekExpand}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+            onClick={() => setExpanded((v) => !v)}
+            className="px-1 text-gray-400 hover:text-gray-700"
             aria-expanded={expanded}
+            aria-label={expanded ? "Collapse week" : "Expand week"}
           >
-            <span className={`inline-block transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}>
-              &gt;
-            </span>
+            <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
           </button>
         </div>
       </div>
 
-      {expanded && (
-        <div
-          id={`week-children-${topic.topicId}`}
-          className="mt-3.5 rounded-xl border border-gray-200 bg-gray-50/70 p-3 shadow-inner dark:border-[#1b2c2e] dark:bg-[#071113]"
-        >
+      {expanded ? (
+        <div id={`week-children-${topic.topicId}`} className="border-t border-gray-100 bg-gray-50/60">
           {hasChildren ? (
             topic.children.map((child) => (
               <TopicNode
@@ -691,19 +1139,12 @@ function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic })
               />
             ))
           ) : (
-            <p className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-              {canUpload ? (
-                <>
-                  No sub-topics yet. Use the{" "}
-                  <span className="font-bold text-emerald-500">Add sub-topic</span> button to add one.
-                </>
-              ) : (
-                "No sub-topics for this week yet."
-              )}
+            <p className="px-4 py-3 text-sm text-gray-500">
+              {canUpload ? "No sub-topics yet. Use Add sub-topic to add one." : "No sub-topics for this week yet."}
             </p>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -712,116 +1153,70 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
   const [expanded, setExpanded] = useState(false);
   const hasChildren = (topic.children?.length ?? 0) > 0;
   const fullyCovered = isTopicFullyCovered(topic);
-  const pad = 16 + level * 20;
-
-  const toggleBranchExpand = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    setExpanded((prev) => {
-      const next = !prev;
-      if (next) {
-        requestAnimationFrame(() => {
-          document.getElementById(`topic-children-${topic.topicId}`)?.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
-        });
-      }
-      return next;
-    });
-  };
-
-  const onTitleClick = (e) => {
-    e.stopPropagation();
-    if (hasChildren) toggleBranchExpand(null);
-    else onToggle(topic);
-  };
+  const pad = 16 + level * 18;
 
   return (
     <div>
       <div
-        className="flex min-h-[68px] items-center gap-3 border-b border-gray-200 pr-2 dark:border-[#1b2c2e]"
+        className="flex items-center gap-3 border-b border-gray-100 py-2.5 pr-4 last:border-b-0"
         style={{ paddingLeft: pad }}
       >
         <button
           type="button"
-          className="flex shrink-0 items-center py-3"
+          className="shrink-0"
           onClick={() => onToggle(topic)}
           aria-label={fullyCovered ? "Mark incomplete" : "Mark complete"}
         >
           <span
-            className={`flex h-6 w-6 items-center justify-center rounded border-2 ${
+            className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
               fullyCovered
-                ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
-                : "border-gray-300 dark:border-gray-600"
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-gray-300 bg-white text-transparent"
             }`}
           >
-            {fullyCovered ? "✓" : ""}
+            ✓
           </span>
         </button>
+
         <button
           type="button"
-          className={`min-w-0 flex-1 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 ${
-            hasChildren ? "hover:text-emerald-600 dark:hover:text-emerald-400" : ""
-          }`}
-          onClick={onTitleClick}
-          aria-expanded={hasChildren ? expanded : undefined}
+          className="min-w-0 flex-1 text-left text-sm text-gray-900"
+          onClick={() => {
+            if (hasChildren) setExpanded((v) => !v);
+            else onToggle(topic);
+          }}
         >
           {topic.topicTitle}
-          {hasChildren && !expanded && (
-            <span className="ml-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
-              ({topic.children.length} nested — tap to expand)
-            </span>
-          )}
+          {hasChildren && !expanded ? (
+            <span className="ml-2 text-xs text-gray-500">({topic.children.length})</span>
+          ) : null}
         </button>
-        <div className="flex shrink-0 items-center gap-5">
-          <button
-            type="button"
-            onClick={() => onToggle(topic)}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
-              fullyCovered
-                ? "border-emerald-500 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400"
-                : "border-gray-300 dark:border-gray-600"
-            }`}
-            aria-label={fullyCovered ? "Mark incomplete" : "Mark complete"}
-          >
-            {fullyCovered ? "✓" : ""}
-          </button>
-          {canUpload && (
+
+        <div className="flex shrink-0 items-center gap-2">
+          {canUpload ? (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddSubTopic(topic.topicId, weekNo, topic.topicTitle);
-              }}
-              className="app-btn-primary shrink-0 rounded-full px-2.5 py-1 text-[10px] leading-tight sm:text-xs"
-              title="Add nested sub-topic"
-              aria-label="Add nested sub-topic"
+              onClick={() => onAddSubTopic(topic.topicId, weekNo, topic.topicTitle)}
+              className="text-xs font-semibold text-brand hover:underline"
             >
               Add
             </button>
-          )}
+          ) : null}
           {hasChildren ? (
             <button
               type="button"
-              onClick={toggleBranchExpand}
-              className="week-card__chevron flex h-11 w-11 items-center justify-center rounded-full text-2xl"
+              onClick={() => setExpanded((v) => !v)}
+              className="px-1 text-gray-400 hover:text-gray-700"
               aria-expanded={expanded}
-              aria-label={expanded ? "Collapse nested topics" : "Expand nested topics"}
             >
-              <span className={`inline-block transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}>
-                ›
-              </span>
+              <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
             </button>
-          ) : (
-            <span className="inline-block w-11 shrink-0" aria-hidden />
-          )}
+          ) : null}
         </div>
       </div>
-      {hasChildren && expanded && (
-        <div id={`topic-children-${topic.topicId}`} className="week-topic-panel">
+
+      {hasChildren && expanded ? (
+        <div id={`topic-children-${topic.topicId}`}>
           {topic.children.map((child) => (
             <TopicNode
               key={child.topicId}
@@ -834,7 +1229,7 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
             />
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

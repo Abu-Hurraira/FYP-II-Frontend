@@ -37,12 +37,19 @@ export function clearArchivedPreferencesForProgram(programId, outcomeTypes = ["P
 }
 
 export function formatRestoreSummary(result, outcomeLabel) {
-  const restored = result?.restoredCount ?? 0;
-  const skipped = result?.skippedCount ?? 0;
+  const restored =
+    result?.restoredCount ?? result?.addedCount ?? result?.AddedCount ?? 0;
+  const skipped =
+    result?.skippedCount ??
+    result?.SkippedCount ??
+    (result?.alreadyLinkedCount ?? result?.AlreadyLinkedCount ?? 0);
   const errors = result?.errors || [];
-  let message = `Restored ${restored} archived ${outcomeLabel}(s) with Old status.`;
-  if (skipped > 0) {
-    message += `\nSkipped ${skipped}.`;
+  const custom = result?.message ?? result?.Message;
+  let message =
+    custom ||
+    `Restored ${restored} ${outcomeLabel}(s) from the saved catalog.`;
+  if (!custom && skipped > 0) {
+    message += `\nSkipped ${skipped} (already present or invalid).`;
   }
   if (errors.length) {
     message += `\n\n${errors.slice(0, 5).join("\n")}`;

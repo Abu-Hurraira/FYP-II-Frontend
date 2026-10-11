@@ -1,11 +1,12 @@
 import request from "./apiClient";
+import { asList } from "../utils/helpers";
 
 export const getPrograms = async () => {
-  return await request("/AcademicPrograms");
+  return asList(await request("/AcademicPrograms"));
 };
 
 export const getProgramsDropdown = async () => {
-  return await request("/AcademicPrograms/dropdown");
+  return asList(await request("/AcademicPrograms/dropdown"));
 };
 
 export const createProgram = async (program) => {

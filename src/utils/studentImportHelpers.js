@@ -37,14 +37,14 @@ const EMAIL_COLUMN_KEYS = ["email", "mail", "e-mail"];
 export const STUDENT_IMPORT_SAMPLE_ROWS = [
   {
     Section: "BSCS-3A",
-    "Full Name": "Ammar Abu Hurraira",
-    "Ardi Number": "2023-Arid-0184",
+    StuName: "Ammar Abu Hurraira",
+    "Reg_no": "2023-Arid-0184",
     Email: "ammar@gmail.com",
   },
   {
     Section: "BSCS-3A",
-    "Full Name": "Abubakar Siddiq",
-    "Ardi Number": "2023-Arid-0168",
+    StuName: "Abubakar Siddiq",
+    "Reg_no": "2023-Arid-0168",
     Email: "abubakar@gmail.com",
   },
 ];

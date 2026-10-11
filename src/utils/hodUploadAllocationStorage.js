@@ -3,14 +3,24 @@ import {
   FULL_UPLOAD_ALLOCATION_ROW,
 } from "../constants/uploadAllocationTypes";
 
-const STORAGE_KEY = "hod-upload-allocation";
-
 export function getCourseGroupKey(course) {
   return String(
     course.courseId ?? course.CourseId ?? course.courseTitle ?? course.CourseTitle ?? ""
   )
     .trim()
     .toLowerCase();
+}
+
+/** All sections of the same subject (every teacher), e.g. Applied Physics. */
+export function groupOfferedCoursesByCourse(offeredCourses = []) {
+  const groups = new Map();
+  for (const course of offeredCourses) {
+    const key = getCourseGroupKey(course);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(course);
+  }
+  return groups;
 }
 
 /** Section A: BAI-6A, BCS-5A, plain A, Section A, etc. */
@@ -25,15 +35,19 @@ export function normalizeAllocationRow(raw) {
   if (!raw || typeof raw !== "object") {
     return { ...EMPTY_UPLOAD_ALLOCATION_ROW };
   }
-  const hasClos = Boolean(raw.clos ?? raw.CanUploadCLOs);
+  const hasClos = Boolean(raw.clos ?? raw.Clos ?? raw.CanUploadCLOs);
   return {
     clos: hasClos,
-    cloPloMapping: Boolean(raw.cloPloMapping ?? raw.CanManageCloPloMapping ?? hasClos),
-    cloTaskMapping: Boolean(raw.cloTaskMapping ?? raw.CanManageCloTaskMapping ?? hasClos),
-    mid: Boolean(raw.mid ?? raw.CanUploadMid),
-    final: Boolean(raw.final ?? raw.CanUploadFinal),
-    folderTemplate: Boolean(raw.folderTemplate ?? raw.CanUploadFolderTemplate),
+    cloPloMapping: Boolean(raw.cloPloMapping ?? raw.CloPloMapping ?? raw.CanManageCloPloMapping ?? hasClos),
+    cloTaskMapping: Boolean(raw.cloTaskMapping ?? raw.CloTaskMapping ?? raw.CanManageCloTaskMapping ?? hasClos),
+    mid: Boolean(raw.mid ?? raw.Mid ?? raw.CanUploadMid),
+    final: Boolean(raw.final ?? raw.Final ?? raw.CanUploadFinal),
+    folderTemplate: Boolean(raw.folderTemplate ?? raw.FolderTemplate ?? raw.CanUploadFolderTemplate),
   };
+}
+
+export function configHasAnyTicks(config) {
+  return Object.values(config?.allocations ?? {}).some((row) => rowHasAnyPermission(row));
 }
 
 export function normalizeAllocationConfig(raw) {
@@ -54,35 +68,19 @@ export function normalizeAllocationConfig(raw) {
   };
 }
 
-export function loadUploadAllocationConfig() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return normalizeAllocationConfig(null);
-    return normalizeAllocationConfig(JSON.parse(raw));
-  } catch {
-    return normalizeAllocationConfig(null);
-  }
-}
-
-export function saveUploadAllocationConfig(config) {
-  const payload = {
-    configured: Boolean(config?.configured),
-    allocations: config?.allocations ?? {},
-    updatedAt: new Date().toISOString(),
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  return payload;
-}
-
-export function groupOfferedCoursesByCourse(offeredCourses = []) {
-  const groups = new Map();
-  for (const course of offeredCourses) {
-    const key = getCourseGroupKey(course);
-    if (!key) continue;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(course);
-  }
-  return groups;
+export function pickFirstSectionARow(courses = []) {
+  const sorted = [...courses].sort((a, b) => {
+    const sectionCmp = String(a.sectionName ?? a.SectionName ?? "").localeCompare(
+      String(b.sectionName ?? b.SectionName ?? ""),
+      undefined,
+      { numeric: true }
+    );
+    if (sectionCmp !== 0) return sectionCmp;
+    return String(a.programName ?? a.ProgramName ?? "").localeCompare(
+      String(b.programName ?? b.ProgramName ?? "")
+    );
+  });
+  return sorted.find((row) => isSectionA(row.sectionName ?? row.SectionName)) ?? sorted[0];
 }
 
 export function pickSectionARow(courses = []) {
@@ -93,83 +91,81 @@ export function rowHasAnyPermission(row) {
   return Boolean(row?.clos || row?.cloPloMapping || row?.cloTaskMapping || row?.mid || row?.final || row?.folderTemplate);
 }
 
-/** Group offered courses by course id/title and pick Section A row for defaults. */
-export function buildDefaultAllocations(offeredCourses = []) {
-  const allocations = {};
-  for (const courses of groupOfferedCoursesByCourse(offeredCourses).values()) {
-    if (!courses.length) continue;
-    const target = courses.length === 1 ? courses[0] : pickSectionARow(courses);
-    const offeredCourseId = target.offeredCourseId ?? target.OfferedCourseId;
-    if (offeredCourseId == null) continue;
-    allocations[String(offeredCourseId)] = { ...FULL_UPLOAD_ALLOCATION_ROW };
-  }
-  return allocations;
+function courseIdOf(course) {
+  return course?.offeredCourseId ?? course?.OfferedCourseId;
 }
 
 /**
- * Save rules:
- * - No manual ticks anywhere → Section A (or only section) full per course
- * - Single-section course → always full allocation on that row
- * - HOD edits one or more courses → those courses use exact draft; other courses → Section A auto
+ * Auto allocation: exactly one Section A per subject (first A of that course).
+ * Example: Adv Database → BSAI-6A only. BSCS-5A / BSSE-6A stay unticked.
  */
-export function buildAllocationsForSave(offeredCourses = [], draftRows = {}) {
-  const groups = groupOfferedCoursesByCourse(offeredCourses);
+export function buildSectionAAllocations(offeredCourses = []) {
+  const allocations = {};
+
+  for (const courses of groupOfferedCoursesByCourse(offeredCourses).values()) {
+    if (!courses.length) continue;
+    const target = pickFirstSectionARow(courses);
+    const targetId = String(courseIdOf(target ?? {}));
+
+    for (const course of courses) {
+      const id = String(courseIdOf(course));
+      if (!id || id === "undefined") continue;
+      allocations[id] =
+        id === targetId && targetId !== "undefined"
+          ? { ...FULL_UPLOAD_ALLOCATION_ROW }
+          : { ...EMPTY_UPLOAD_ALLOCATION_ROW };
+    }
+  }
+
+  return allocations;
+}
+
+/** How many current table rows actually have a tick. */
+export function countVisibleTicks(offeredCourses = [], allocations = {}) {
+  return offeredCourses.filter((course) =>
+    rowHasAnyPermission(normalizeAllocationRow(allocations[String(courseIdOf(course))]))
+  ).length;
+}
+
+export function rowsEqual(a, b) {
+  const left = normalizeAllocationRow(a);
+  const right = normalizeAllocationRow(b);
+  return (
+    left.clos === right.clos &&
+    left.cloPloMapping === right.cloPloMapping &&
+    left.cloTaskMapping === right.cloTaskMapping &&
+    left.mid === right.mid &&
+    left.final === right.final &&
+    left.folderTemplate === right.folderTemplate
+  );
+}
+
+/**
+ * Auto Section A only when nothing was allocated before AND the HOD did not tick anything.
+ * Otherwise save the exact checkboxes (manual allocation).
+ */
+export function buildAllocationsForSave(offeredCourses = [], draftRows = {}, { hasPriorAllocation = false } = {}) {
+  const hasManual = offeredCourses.some((course) =>
+    rowHasAnyPermission(normalizeAllocationRow(draftRows[String(courseIdOf(course))]))
+  );
+
+  if (!hasPriorAllocation && !hasManual) {
+    return buildSectionAAllocations(offeredCourses);
+  }
+
   const result = {};
-
-  const manuallyEditedGroups = new Set();
-  for (const [groupKey, courses] of groups) {
-    const edited = courses.some((course) => {
-      const row = normalizeAllocationRow(draftRows[String(course.offeredCourseId)]);
-      return rowHasAnyPermission(row);
-    });
-    if (edited) manuallyEditedGroups.add(groupKey);
+  for (const course of offeredCourses) {
+    const id = String(courseIdOf(course));
+    if (!id || id === "undefined") continue;
+    result[id] = normalizeAllocationRow(draftRows[id]);
   }
-
-  const noManualEdits = manuallyEditedGroups.size === 0;
-
-  for (const [groupKey, courses] of groups) {
-    if (courses.length === 1) {
-      const offeredCourseId = courses[0].offeredCourseId ?? courses[0].OfferedCourseId;
-      if (offeredCourseId != null) {
-        result[String(offeredCourseId)] = { ...FULL_UPLOAD_ALLOCATION_ROW };
-      }
-      continue;
-    }
-
-    if (noManualEdits) {
-      const sectionA = pickSectionARow(courses);
-      const offeredCourseId = sectionA.offeredCourseId ?? sectionA.OfferedCourseId;
-      if (offeredCourseId != null) {
-        result[String(offeredCourseId)] = { ...FULL_UPLOAD_ALLOCATION_ROW };
-      }
-      continue;
-    }
-
-    if (manuallyEditedGroups.has(groupKey)) {
-      for (const course of courses) {
-        const id = String(course.offeredCourseId);
-        const draft = normalizeAllocationRow(draftRows[id]);
-        if (rowHasAnyPermission(draft)) {
-          result[id] = { ...draft };
-        }
-      }
-      continue;
-    }
-
-    const sectionA = pickSectionARow(courses);
-    const offeredCourseId = sectionA.offeredCourseId ?? sectionA.OfferedCourseId;
-    if (offeredCourseId != null) {
-      result[String(offeredCourseId)] = { ...FULL_UPLOAD_ALLOCATION_ROW };
-    }
-  }
-
   return result;
 }
 
 export function getAllocationForOfferedCourse(offeredCourseId, config) {
   const normalized = normalizeAllocationConfig(config);
   if (!normalized.configured) {
-    return { ...FULL_UPLOAD_ALLOCATION_ROW };
+    return { ...EMPTY_UPLOAD_ALLOCATION_ROW };
   }
   const row = normalized.allocations[String(offeredCourseId)];
   return row ? normalizeAllocationRow(row) : { ...EMPTY_UPLOAD_ALLOCATION_ROW };

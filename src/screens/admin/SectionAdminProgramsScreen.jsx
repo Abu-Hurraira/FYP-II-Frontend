@@ -21,7 +21,14 @@ export default function SectionAdminProgramsScreen() {
         setLoading(true);
         const data = await getPrograms();
         if (!mounted) return;
-        setPrograms(data || []);
+        setPrograms(
+          (data || []).map((p) => ({
+            ...p,
+            programId: p.programId ?? p.ProgramId,
+            programName: p.programName ?? p.ProgramName ?? "",
+            programCode: p.programCode ?? p.ProgramCode ?? "",
+          }))
+        );
       } catch (error) {
         showAlert("Error", error.message);
       } finally {
@@ -54,7 +61,7 @@ export default function SectionAdminProgramsScreen() {
                   key={p.programId}
                   type="button"
                   onClick={() =>
-                    navigate(`/section-admin/program/${p.programId}/sessions`, {
+                    navigate(`/admin/program/${p.programId}/sessions`, {
                       state: { program: p },
                     })
                   }

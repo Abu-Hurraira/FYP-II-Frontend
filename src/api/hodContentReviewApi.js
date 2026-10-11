@@ -1,4 +1,4 @@
-import { request } from "./apiClient";
+import request from "./apiClient";
 
 export async function getHodContentReviewQueue(hodUserId) {
   return await request(`/HodContentReview/${hodUserId}/queue`);

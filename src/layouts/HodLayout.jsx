@@ -28,14 +28,6 @@ function SidebarIconGrid() {
   );
 }
 
-function SidebarIconBook() {
-  return (
-    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6l-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2h4l2-2m0-14l2-2h4a2 2 0 012 2v14a2 2 0 01-2 2h-4l-2-2m0-14v14" />
-    </svg>
-  );
-}
-
 function SidebarIconAcademic() {
   return (
     <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,10 +88,6 @@ export default function HodLayout() {
           <NavLink to="/hod" end className={sidebarNavClassFromActive(isExactPath(pathname, "/hod"))}>
             <SidebarIconGrid />
             Home
-          </NavLink>
-          <NavLink to="/hod/courses" className={sidebarNavClassFromActive(isPathOrChild(pathname, "/hod/courses"))}>
-            <SidebarIconBook />
-            Courses
           </NavLink>
           <NavLink to="/hod/programs" className={sidebarNavClassFromActive(isPathOrChild(pathname, "/hod/programs"))}>
             <SidebarIconAcademic />

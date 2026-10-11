@@ -1,7 +1,7 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getHodSubmittedFolders } from "../../api/hodApi";
-import { approveSubmittedFolder, rejectSubmittedFolder } from "../../api/hodFolderReviewApi";
+import { approveSubmittedFolder, rejectSubmittedFolder, unlockSubmittedFolder } from "../../api/hodFolderReviewApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import theme from "../../styles/theme";
 import { showAlert, showConfirm } from "../../utils/dialogs";
@@ -136,7 +136,11 @@ export default function HodSubmittedFoldersScreen() {
               return (
                 <article
                   key={item.offeredCourseId}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 shadow-sm"
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-card shadow-sm ${
+                    approved
+                      ? "border-emerald-200 bg-emerald-50"
+                      : "border-gray-100 bg-white"
+                  }`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -179,7 +183,28 @@ export default function HodSubmittedFoldersScreen() {
                           Reject
                         </button>
                       </>
-                    ) : null}
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (!(await showConfirm("Unlock Folder", "Unlock this approved folder so the teacher can revise?"))) return;
+                          try {
+                            setActionId(item.offeredCourseId);
+                            await unlockSubmittedFolder(item.offeredCourseId, hodUserId);
+                            showAlert("Unlocked", "Folder unlocked for the teacher.");
+                            await loadFolders();
+                          } catch (error) {
+                            showAlert("Error", error.message);
+                          } finally {
+                            setActionId(null);
+                          }
+                        }}
+                        className="rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
+                      >
+                        Unlock
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy}
@@ -207,21 +232,21 @@ export default function HodSubmittedFoldersScreen() {
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="text-lg font-semibold text-gray-900">Reject Folder</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Review</h2>
             <p className="mt-1 text-sm text-gray-600">
               {[rejectTarget.courseTitle, rejectTarget.sectionName].filter(Boolean).join(" · ")}
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              The folder will be unlocked for the teacher. Your reason will appear in their notifications.
+              The folder will be unlocked. Your reason will show on the teacher’s folder page.
             </p>
 
             <label className="mt-4 block text-sm font-semibold text-gray-700">
-              Rejection reason
+              Reason
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm"
-                placeholder="Explain what needs to be fixed…"
+                className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal"
+                placeholder="Write why you are rejecting this…"
                 autoFocus
               />
             </label>

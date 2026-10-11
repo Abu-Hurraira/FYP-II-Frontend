@@ -1,8 +1,9 @@
-import request, { API_BASE_URL } from "./apiClient";
+import request from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
+import { asList } from "../utils/helpers";
 
 export const getSectionsBySession = async (sessionId) => {
-  return await request(`/Sections/by-session/${sessionId}`);
+  return asList(await request(`/Sections/by-session/${sessionId}`));
 };
 
 export const createSection = async (section) => {
@@ -12,24 +13,26 @@ export const createSection = async (section) => {
   });
 };
 
+export const updateSection = async (sectionId, section) => {
+  return await request(`/Sections/${sectionId}`, {
+    method: "PUT",
+    body: JSON.stringify(section),
+  });
+};
+
+export const deleteSection = async (sectionId) => {
+  return await request(`/Sections/${sectionId}`, {
+    method: "DELETE",
+  });
+};
+
 export const uploadAttendanceSheet = async (sectionId, file) => {
   const formData = new FormData();
   appendFormFile(formData, "file", file, "attendance.xlsx");
 
-  const response = await fetch(
-    `${API_BASE_URL}/Sections/upload-attendance/${sectionId}`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to upload attendance sheet.");
-  }
-
-  return data;
+  return await request(`/Sections/upload-attendance/${sectionId}`, {
+    method: "POST",
+    body: formData,
+    timeoutMs: 120000,
+  });
 };

@@ -2,10 +2,16 @@ import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { AuthContext } from "../../context/AuthContext.jsx";
-import { createProgram, getPrograms } from "../../api/programsApi";
+import {
+  createProgram,
+  deleteProgram,
+  getPrograms,
+  updateProgram,
+} from "../../api/programsApi";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
-import { showAlert } from "../../utils/dialogs";
+import ListRowActions from "../../components/ListRowActions.jsx";
+import { showAlert, showConfirm } from "../../utils/dialogs";
 
 export default function HodProgramsScreen() {
   const { user } = useContext(AuthContext);
@@ -14,6 +20,7 @@ export default function HodProgramsScreen() {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [programName, setProgramName] = useState("");
   const [programCode, setProgramCode] = useState("");
 
@@ -33,21 +40,60 @@ export default function HodProgramsScreen() {
     loadPrograms();
   }, []);
 
-  const handleCreateProgram = async () => {
+  const openAdd = () => {
+    setEditing(null);
+    setProgramName("");
+    setProgramCode("");
+    setModalVisible(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setProgramName(item.programName || item.ProgramName || "");
+    setProgramCode(item.programCode || item.ProgramCode || "");
+    setModalVisible(true);
+  };
+
+  const handleSaveProgram = async () => {
     if (!programName.trim()) {
       showAlert("Validation Error", "Program name is required.");
       return;
     }
 
     try {
-      await createProgram({
+      const payload = {
         programName: programName.trim(),
         programCode: programCode.trim() || null,
-      });
-
+      };
+      if (editing) {
+        await updateProgram(editing.programId ?? editing.ProgramId, payload);
+        showAlert("Saved", "Program updated.");
+      } else {
+        await createProgram(payload);
+        showAlert("Saved", "Program created.");
+      }
       setModalVisible(false);
+      setEditing(null);
       setProgramName("");
       setProgramCode("");
+      await loadPrograms();
+    } catch (error) {
+      showAlert("Error", error.message);
+    }
+  };
+
+  const handleDelete = async (item) => {
+    if (
+      !(await showConfirm(
+        "Delete program",
+        `Delete ${item.programName || item.ProgramName}? Related sessions/mappings may block this.`
+      ))
+    ) {
+      return;
+    }
+    try {
+      await deleteProgram(item.programId ?? item.ProgramId);
+      showAlert("Deleted", "Program deleted.");
       await loadPrograms();
     } catch (error) {
       showAlert("Error", error.message);
@@ -62,7 +108,7 @@ export default function HodProgramsScreen() {
           <h1 className="truncate text-xl font-semibold text-gray-900">Programs</h1>
           <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "HOD"}</p>
         </div>
-        <AddHeaderButton label="Add Program" onClick={() => setModalVisible(true)} />
+        <AddHeaderButton label="Add Program" onClick={openAdd} />
       </div>
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
@@ -76,20 +122,33 @@ export default function HodProgramsScreen() {
         ) : (
           <div className="space-y-2.5 pt-2">
             {programs.map((item) => (
-              <button
-                key={item.programId}
-                type="button"
-                onClick={() =>
-                  navigate(`/hod/program/${item.programId}/menu`, { state: { program: item } })
-                }
-                className="flex min-h-[48px] w-full items-center justify-between rounded-2xl border border-gray-100 bg-white shadow-card px-4 py-3 text-left shadow-sm transition hover:bg-brand-muted/40"
+              <div
+                key={item.programId ?? item.ProgramId}
+                className="flex w-full items-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-card"
               >
-                <span className="truncate text-sm font-semibold text-gray-900">{item.programName}</span>
-                <span className="shrink-0 text-xl text-gray-300">›</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/hod/program/${item.programId ?? item.ProgramId}/menu`, {
+                      state: { program: item },
+                    })
+                  }
+                  className="min-w-0 flex-1 text-left transition hover:opacity-80"
+                >
+                  <p className="text-sm font-semibold text-gray-900">
+                    {item.programName || item.ProgramName}
+                  </p>
+                  {(item.programCode || item.ProgramCode) && (
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {item.programCode || item.ProgramCode}
+                    </p>
+                  )}
+                </button>
+                <ListRowActions onEdit={() => openEdit(item)} onDelete={() => handleDelete(item)} />
+              </div>
             ))}
             {programs.length === 0 && (
-              <p className="mt-10 text-center font-bold text-gray-500">No programs added yet.</p>
+              <p className="py-10 text-center text-sm text-gray-500">No programs yet.</p>
             )}
           </div>
         )}
@@ -106,33 +165,38 @@ export default function HodProgramsScreen() {
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-3 text-center text-lg font-semibold text-gray-900">Create Program</h2>
-            <label className="text-sm font-extrabold text-gray-800">Program Name</label>
-            <input
-              className="mb-4 mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-              placeholder="e.g. Computer Science"
-              value={programName}
-              onChange={(e) => setProgramName(e.target.value)}
-            />
-            <label className="text-sm font-extrabold text-gray-800">Program Code</label>
-            <input
-              className="mb-4 mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-              placeholder="e.g. BSCS"
-              value={programCode}
-              onChange={(e) => setProgramCode(e.target.value)}
-            />
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              {editing ? "Edit Program" : "Add Program"}
+            </h2>
+            <label className="mb-3 block text-sm font-semibold text-gray-700">
+              Program name
+              <input
+                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                placeholder="e.g. BS Computer Science"
+                value={programName}
+                onChange={(e) => setProgramName(e.target.value)}
+              />
+            </label>
+            <label className="mb-4 block text-sm font-semibold text-gray-700">
+              Program code
+              <input
+                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                placeholder="e.g. BSCS"
+                value={programCode}
+                onChange={(e) => setProgramCode(e.target.value)}
+              />
+            </label>
             <button
               type="button"
-              onClick={handleCreateProgram}
-              className="w-full rounded-lg py-3 font-black text-white"
-              style={{ backgroundColor: theme.colors.primaryDark }}
+              onClick={handleSaveProgram}
+              className="app-btn-primary w-full py-3"
             >
-              Create Program
+              Save
             </button>
             <button
               type="button"
               onClick={() => setModalVisible(false)}
-              className="mt-3 w-full text-center font-bold text-gray-500"
+              className="mt-3 w-full font-bold text-gray-500"
             >
               Cancel
             </button>

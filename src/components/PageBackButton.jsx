@@ -1,29 +1,25 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-/** Top-level sidebar destinations: no ← (user uses sidebar to move between these). */
+/** Sidebar destinations: no ← (user uses sidebar to move between these). */
 const MAIN_TAB_PATHS = new Set([
   "/admin",
   "/admin/faculty",
-  "/admin/profile",
+  "/admin/programs",
+  "/admin/enrollment",
+  "/admin/grader-allocations",
   "/admin/audit",
   "/teacher",
-  "/teacher/profile",
-  "/teacher/notifications",
+  "/teacher/attendance",
   "/teacher/submit-folders",
-  "/teacher/placeholder",
   "/section-admin",
-  "/section-admin/profile",
-  "/section-admin/audit",
+  "/section-admin/enrollment",
   "/section-admin/grader-allocations",
   "/hod",
-  "/hod/courses",
   "/hod/programs",
   "/hod/graders",
   "/hod/allocation",
   "/hod/submitted-folders",
-  "/hod/notifications",
-  "/hod/profile",
 ]);
 
 function isMainTabPath(pathname) {
@@ -33,8 +29,8 @@ function isMainTabPath(pathname) {
 }
 
 /**
- * Header back: ← only, left of the page title on nested routes.
- * Hidden on primary sidebar “tab” pages (Programs list, Courses, etc.).
+ * Header back: ← left of the page title on nested routes.
+ * Hidden on primary sidebar tabs.
  */
 export default function PageBackButton({ className = "" }) {
   const navigate = useNavigate();

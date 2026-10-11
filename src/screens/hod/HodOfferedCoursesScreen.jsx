@@ -2,8 +2,8 @@ import React, { useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import theme from "../../styles/theme";
 import { AuthContext } from "../../context/AuthContext.jsx";
-import { getCourses } from "../../api/coursesApi";
-import { getFaculty } from "../../api/usersApi";
+import { getCoursesDropdown } from "../../api/coursesApi";
+import { getUsersDropdownByRole } from "../../api/usersApi";
 import { getSectionsBySession } from "../../api/sectionsApi";
 import {
   createOfferedCourse,
@@ -23,8 +23,12 @@ export default function HodOfferedCoursesScreen() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { session } = location.state || {};
-  const valid = session && String(session.sessionId) === String(sessionId);
+  const { session: stateSession } = location.state || {};
+  const [session, setSession] = useState(
+    stateSession && String(stateSession.sessionId) === String(sessionId)
+      ? stateSession
+      : { sessionId: Number(sessionId) }
+  );
 
   const [offeredCourses, setOfferedCourses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -43,17 +47,33 @@ export default function HodOfferedCoursesScreen() {
   const [pickerType, setPickerType] = useState(null);
 
   const loadScreenData = async () => {
-    if (!valid) return;
+    const sid = Number(session?.sessionId ?? sessionId);
+    if (!sid) return;
     try {
       setLoading(true);
-      const offeredData = await getOfferedCoursesBySession(session.sessionId);
-      const sectionData = await getSectionsBySession(session.sessionId);
-      const courseData = await getCourses();
-      const facultyData = await getFaculty();
+      const [offeredData, sectionData, courseData, facultyData] = await Promise.all([
+        getOfferedCoursesBySession(sid),
+        getSectionsBySession(sid),
+        getCoursesDropdown(),
+        getUsersDropdownByRole("Teacher"),
+      ]);
+      setSession((prev) => ({ ...prev, sessionId: sid }));
       setOfferedCourses(offeredData || []);
       setSections(sectionData || []);
-      setCourses(courseData || []);
-      setFaculty(facultyData || []);
+      setCourses(
+        (courseData || []).map((c) => ({
+          courseId: c.value ?? c.Value ?? c.courseId ?? c.CourseId,
+          courseTitle: c.label ?? c.Label ?? c.courseTitle ?? c.CourseTitle ?? "",
+          courseCode: c.courseCode ?? c.CourseCode ?? "",
+        }))
+      );
+      setFaculty(
+        (facultyData || []).map((u) => ({
+          userId: u.value ?? u.Value ?? u.userId ?? u.UserId,
+          fullName: u.label ?? u.Label ?? u.fullName ?? u.FullName ?? "",
+          email: u.email ?? u.Email ?? "",
+        }))
+      );
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -63,7 +83,7 @@ export default function HodOfferedCoursesScreen() {
 
   useEffect(() => {
     loadScreenData();
-  }, [valid, sessionId]);
+  }, [sessionId]);
 
   const pickExcelFile = (e) => {
     const file = e.target.files?.[0];
@@ -206,23 +226,6 @@ Errors: ${result.errorCount || 0}${errorPreview}`
     if (pickerType === "section") setSelectedSection(item);
     setPickerType(null);
   };
-
-  if (!valid) {
-    return (
-      <div className="min-h-full bg-page">
-        <div className="flex flex-wrap items-start gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-          <PageBackButton className="mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-gray-900">Offered Courses</h1>
-            <p className="mt-1 text-sm text-gray-500">Session missing. Navigate from session details.</p>
-            <button className="mt-4 font-bold text-brand" type="button" onClick={() => navigate("/hod/programs")}>
-              Programs
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-full bg-page">

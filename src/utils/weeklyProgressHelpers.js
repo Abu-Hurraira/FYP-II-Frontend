@@ -113,9 +113,12 @@ export function isFolderLockedRecord(record) {
 /** Teacher-facing folder submission status for list badges and banners. */
 export function teacherFolderSubmissionStatus(record) {
   const review = folderReviewStatusFromRecord(record).toLowerCase();
-  if (review === "approved") return "Approved";
-  if (review === "rejected") return "Rejected";
-  if (isFolderLockedRecord(record)) return "Submitted";
+  const folderStatus = String(
+    record?.folderStatus ?? record?.FolderStatus ?? ""
+  ).toLowerCase();
+  if (review === "approved" || folderStatus === "approved") return "Approved";
+  if (review === "rejected" || folderStatus === "rejected") return "Rejected";
+  if (isFolderLockedRecord(record) || folderStatus === "submitted") return "Submitted";
   return "In Progress";
 }
 

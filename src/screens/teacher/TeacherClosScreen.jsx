@@ -5,26 +5,25 @@ import {
   deleteCLO,
   getCLOsByProgramCourse,
   importCLOs,
-  restoreCLOsByProgramCourse,
   submitCLOsForApproval,
   updateCLO,
 } from "../../api/closApi";
 import { getOfferedCourseUploadPermissions } from "../../api/hodUploadAllocationApi";
-import { getCourseMenu } from "../../api/teacherApi";
+import { getCourseMenu, getContentStatuses } from "../../api/teacherApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import theme from "../../styles/theme";
 import {
-  formatRestoreSummary,
   getArchiveId,
   isOldOutcome,
 } from "../../utils/outcomeArchivedView";
 import { extractOutcomeNumber, sortClos } from "../../utils/outcomeHelpers";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
-import { canManageClosFromPermissions, filterClosForViewer } from "../../utils/uploadAllocationHelpers";
+import { canManageClosFromPermissions, filterClosForViewer, getCloApprovalStatus, pickContentTypeStatus, pickHodFeedback } from "../../utils/uploadAllocationHelpers";
+import { HodRejectionBanner, useHodRejectionAlert } from "../../components/HodRejectionNotice.jsx";
 
 const CLO_MAX_COUNT = 20;
 
@@ -58,6 +57,7 @@ export default function TeacherClosScreen() {
 
   const [course, setCourse] = useState(null);
   const [items, setItems] = useState([]);
+  const [contentStatuses, setContentStatuses] = useState([]);
   const [uploadPermissions, setUploadPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -70,14 +70,18 @@ export default function TeacherClosScreen() {
   const [uploading, setUploading] = useState(false);
 
   const canManage = canManageClosFromPermissions(uploadPermissions);
+  const isAllocatedTeacher = Boolean(
+    uploadPermissions?.isAllocatedTeacher ?? uploadPermissions?.IsAllocatedTeacher
+  );
+  const canSeeDrafts = canManage || isAllocatedTeacher;
   const programCourseId = course?.programCourseId ?? course?.ProgramCourseId;
 
   const draftOrRejectedCount = useMemo(
     () =>
       items.filter((item) => {
         if (isOldOutcome(item)) return false;
-        const status = String(item.approvalStatus || item.ApprovalStatus || "Draft").toLowerCase();
-        return status === "draft" || status === "rejected" || status === "";
+        const status = getCloApprovalStatus(item);
+        return status === "draft" || status === "rejected";
       }).length,
     [items]
   );
@@ -85,13 +89,19 @@ export default function TeacherClosScreen() {
   const pendingCount = useMemo(
     () =>
       items.filter((item) => {
-        const status = String(item.approvalStatus || item.ApprovalStatus || "").toLowerCase();
-        return status === "pending";
+        return getCloApprovalStatus(item) === "pending";
       }).length,
     [items]
   );
 
   const canClickUpload = canManage && draftOrRejectedCount > 0 && !submitting;
+  const cloStatus = String(pickContentTypeStatus(contentStatuses, "Clos", "Draft"));
+  const cloRejected = cloStatus.toLowerCase() === "rejected" || items.some((item) => getCloApprovalStatus(item) === "rejected");
+  const cloRejectReason =
+    pickHodFeedback(contentStatuses, "Clos") ||
+    items.map((item) => String(item.rejectionReason ?? item.RejectionReason ?? "").trim()).find(Boolean) ||
+    "";
+  useHodRejectionAlert(cloRejected, "CLOs", cloRejectReason, !loading);
 
   const loadClos = useCallback(
     async ({ includeArchived = false } = {}) => {
@@ -99,10 +109,13 @@ export default function TeacherClosScreen() {
       const data = await getCLOsByProgramCourse(programCourseId, {
         includeArchived,
         offeredCourseId,
+        teacherUserId,
       });
-      setItems(sortClos(filterClosForViewer(data || [], canManage)));
+      setItems(sortClos(filterClosForViewer(data || [], canManage, isAllocatedTeacher)));
+      const statuses = await getContentStatuses(programCourseId, teacherUserId, offeredCourseId).catch(() => []);
+      setContentStatuses(statuses || []);
     },
-    [programCourseId, offeredCourseId, canManage]
+    [programCourseId, offeredCourseId, canManage, isAllocatedTeacher, teacherUserId]
   );
 
   const loadPage = useCallback(async () => {
@@ -110,7 +123,7 @@ export default function TeacherClosScreen() {
       setLoading(true);
       const [menu, permissions] = await Promise.all([
         getCourseMenu(offeredCourseId),
-        getOfferedCourseUploadPermissions(offeredCourseId).catch(() => ({
+        getOfferedCourseUploadPermissions(offeredCourseId, teacherUserId).catch(() => ({
           clos: false,
           configured: false,
         })),
@@ -118,18 +131,28 @@ export default function TeacherClosScreen() {
       setCourse(menu);
       setUploadPermissions(permissions);
       const manage = canManageClosFromPermissions(permissions);
+      const allocatedTeacher = Boolean(
+        permissions?.isAllocatedTeacher ?? permissions?.IsAllocatedTeacher
+      );
 
       const pcId = menu?.programCourseId ?? menu?.ProgramCourseId;
-      if (pcId) {
-        const data = await getCLOsByProgramCourse(pcId, { offeredCourseId });
-        setItems(sortClos(filterClosForViewer(data || [], manage)));
+      if (pcId && teacherUserId) {
+        const [data, statuses] = await Promise.all([
+          getCLOsByProgramCourse(pcId, {
+            offeredCourseId,
+            teacherUserId,
+          }),
+          getContentStatuses(pcId, teacherUserId, offeredCourseId).catch(() => []),
+        ]);
+        setItems(sortClos(filterClosForViewer(data || [], manage, allocatedTeacher)));
+        setContentStatuses(statuses || []);
       }
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
     }
-  }, [offeredCourseId]);
+  }, [offeredCourseId, teacherUserId]);
 
   useEffect(() => {
     loadPage();
@@ -170,9 +193,11 @@ export default function TeacherClosScreen() {
           {
             cloCode: editingItem.cloCode,
             cloDescription: description.trim(),
+            teacherUserId,
           },
           {
             offeredCourseId,
+            teacherUserId,
             ...(editingOld && archiveId ? { archiveId } : {}),
           }
         );
@@ -188,6 +213,7 @@ export default function TeacherClosScreen() {
         await createCLO({
           programCourseId,
           offeredCourseId,
+          teacherUserId,
           cloCode: nextCode,
           cloDescription: description.trim(),
         });
@@ -213,39 +239,20 @@ export default function TeacherClosScreen() {
         )
       : await showConfirm(
           "Delete CLO",
-          "Move this CLO to old versions? It will be hidden until you load from database."
+          "This CLO will be deleted. You can re-add it with Add or Import Excel."
         );
 
     if (!confirmed) return;
 
     try {
       if (isOld && archiveId) {
-        await deleteCLO(item.cloId, { archiveId, offeredCourseId });
+        await deleteCLO(item.cloId, { archiveId, offeredCourseId, teacherUserId });
       } else {
-        await deleteCLO(item.cloId, { offeredCourseId });
+        await deleteCLO(item.cloId, { offeredCourseId, teacherUserId });
       }
       await loadClos();
     } catch (error) {
       showAlert("Error", error.message);
-    }
-  };
-
-  const handleLoadFromDatabase = async () => {
-    setActionModalVisible(false);
-    if (!programCourseId) return;
-
-    try {
-      setLoading(true);
-      const result = await restoreCLOsByProgramCourse(programCourseId, { offeredCourseId });
-      await loadClos({ includeArchived: false });
-      showAlert(
-        "Restored from database",
-        `${formatRestoreSummary(result, "CLO")} Review drafts and upload for HOD approval.`
-      );
-    } catch (error) {
-      showAlert("Error", error.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -303,14 +310,22 @@ export default function TeacherClosScreen() {
       showAlert("No File", "Please select a file first.");
       return;
     }
-    if (!programCourseId) return;
+    if (!programCourseId || !teacherUserId) {
+      showAlert("Error", "Unable to import CLOs. Missing course or user. Try logging in again.");
+      return;
+    }
 
     try {
       setUploading(true);
-      const result = await importCLOs(programCourseId, selectedFile, { offeredCourseId });
+      const result = await importCLOs(programCourseId, selectedFile, {
+        offeredCourseId,
+        teacherUserId,
+      });
+      const inserted = result.inserted ?? result.Inserted ?? result.insertedCount ?? 0;
+      const skipped = result.skipped ?? result.Skipped ?? result.skippedCount ?? 0;
       showAlert(
         "Import Completed",
-        `Inserted: ${result.insertedCount}\nSkipped: ${result.skippedCount || 0}\n\nImported as drafts. Click Upload to send for HOD approval.`
+        `Inserted: ${inserted}\nSkipped: ${skipped}\n\nImported as drafts. Click Upload to send for HOD approval.`
       );
       setUploadModalVisible(false);
       setActionModalVisible(false);
@@ -352,10 +367,11 @@ export default function TeacherClosScreen() {
       </div>
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
+        {cloRejected ? <HodRejectionBanner title="CLOs" reason={cloRejectReason} /> : null}
         {canManage ? (
           <p className="mb-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
             1) Add/save CLOs as <strong>Draft</strong> · 2) Click <strong>Upload</strong> to notify HOD · 3) After
-            HOD approves, other teachers of this subject can see them.
+            HOD approves, they appear on every other section of this subject as well.
             {pendingCount > 0 ? ` ${pendingCount} CLO(s) waiting for HOD.` : ""}
             {canManage && items.length > 0 && draftOrRejectedCount === 0 && pendingCount === 0
               ? " All current CLOs are already approved — add or edit one to create a new draft for Upload."
@@ -363,8 +379,10 @@ export default function TeacherClosScreen() {
           </p>
         ) : (
           <p className="mb-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
-            View-only: HOD-approved CLOs for this subject are shared with every teacher of the same course
-            (all sections/programs). Drafts stay hidden until HOD approves.
+            View-only: HOD-approved CLOs for this subject are shared with every section of the same course.
+            {isAllocatedTeacher
+              ? " Your drafts from the allocated section also appear here until HOD approves."
+              : " Drafts stay hidden until HOD approves."}
           </p>
         )}
 
@@ -379,7 +397,8 @@ export default function TeacherClosScreen() {
           <div className="space-y-2.5 pb-16">
             {items.map((item) => {
               const isOld = isOldOutcome(item);
-              const approvalStatus = item.approvalStatus || (isOld ? "Approved" : "Draft");
+              const statusKey = isOld ? "approved" : getCloApprovalStatus(item);
+              const approvalStatus = statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
               const rowKey = isOld
                 ? `old-${item.archiveId ?? item.ArchiveId}-${item.cloCode}`
                 : item.cloId;
@@ -392,7 +411,7 @@ export default function TeacherClosScreen() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      {canManage || isOld ? (
+                      {canSeeDrafts || isOld ? (
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                             isOld ? "bg-amber-200 text-amber-900" : approvalBadgeClass(approvalStatus)
@@ -458,14 +477,6 @@ export default function TeacherClosScreen() {
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Import CLOs from file
-            </button>
-            <button
-              type="button"
-              onClick={handleLoadFromDatabase}
-              className="mb-3 w-full rounded-lg py-3 font-black text-white"
-              style={{ backgroundColor: theme.colors.primaryDark }}
-            >
-              Load CLOs from Database
             </button>
             <button
               type="button"
@@ -544,7 +555,7 @@ export default function TeacherClosScreen() {
               Imported rows are saved as drafts. Use Upload to send them for HOD approval.
             </p>
             <label className="flex h-11 cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600">
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={pickFile} />
+              <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               {selectedFile ? selectedFile.name : "Browse"}
             </label>
             <button

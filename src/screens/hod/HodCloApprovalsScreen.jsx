@@ -6,13 +6,193 @@ import {
 } from "../../api/hodCloReviewApi";
 import {
   getHodContentReviewQueue,
+  getHodSubmissionDetails,
   approveHodSubmission,
   rejectHodSubmission,
 } from "../../api/hodContentReviewApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import PageBackButton from "../../components/PageBackButton.jsx";
 import theme from "../../styles/theme";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
+
+function pick(obj, ...keys) {
+  for (const key of keys) {
+    if (obj?.[key] != null) return obj[key];
+  }
+  return undefined;
+}
+
+function SubmissionDetailsBody({ details }) {
+  if (!details) return null;
+
+  const clos = pick(details, "clos", "Clos") || [];
+  const weeks = pick(details, "weeks", "Weeks") || [];
+  const cloPlo = pick(details, "cloPloMatrix", "CloPloMatrix");
+  const cloTask = pick(details, "cloTaskMatrix", "CloTaskMatrix");
+
+  if (clos.length) {
+    return (
+      <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+        {clos.map((clo) => (
+          <div
+            key={pick(clo, "cloId", "CloId")}
+            className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5"
+          >
+            <span className="mr-2 inline-block rounded-full bg-lime-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+              {pick(clo, "cloCode", "CloCode")}
+            </span>
+            <span className="text-sm text-gray-800">
+              {pick(clo, "cloDescription", "CloDescription")}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (weeks.length) {
+    return (
+      <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+        {weeks.map((week) => (
+          <div
+            key={pick(week, "topicId", "TopicId", "weekNo", "WeekNo")}
+            className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm"
+          >
+            <span className="font-semibold">Week {pick(week, "weekNo", "WeekNo")}</span>
+            <span className="ml-2 text-gray-700">{pick(week, "topicName", "TopicName")}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (cloPlo) {
+    const plos = pick(cloPlo, "plos", "Plos") || [];
+    const rows = pick(cloPlo, "clos", "Clos") || [];
+    return (
+      <div className="mt-4 max-h-80 overflow-auto">
+        <table className="min-w-full text-xs">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-2 py-2 text-left">CLO</th>
+              {plos.map((p) => (
+                <th key={pick(p, "ploId", "PloId")} className="px-2 py-2">
+                  {pick(p, "ploCode", "PloCode")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const cells = pick(row, "cells", "Cells") || [];
+              return (
+                <tr key={pick(row, "cloId", "CloId")} className="border-t border-gray-100">
+                  <td className="px-2 py-2 font-bold">{pick(row, "cloCode", "CloCode")}</td>
+                  {plos.map((p) => {
+                    const ploId = pick(p, "ploId", "PloId");
+                    const cell = cells.find(
+                      (c) => Number(pick(c, "ploId", "PloId")) === Number(ploId)
+                    );
+                    const pct = pick(cell, "percentage", "Percentage");
+                    return (
+                      <td key={ploId} className="px-2 py-2 text-center">
+                        {pct != null ? Number(pct) : "–"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (cloTask) {
+    const types = pick(cloTask, "assessmentTypes", "AssessmentTypes") || [];
+    const rows = pick(cloTask, "clos", "Clos") || [];
+    return (
+      <div className="mt-4 max-h-80 overflow-auto">
+        <table className="min-w-full text-xs">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-2 py-2 text-left">CLO</th>
+              {types.map((t) => (
+                <th key={pick(t, "assessmentTypeId", "AssessmentTypeId")} className="px-2 py-2">
+                  {pick(t, "columnLabel", "ColumnLabel") ||
+                    pick(t, "assessmentTypeName", "AssessmentTypeName")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const cells = pick(row, "cells", "Cells") || [];
+              return (
+                <tr key={pick(row, "cloId", "CloId")} className="border-t border-gray-100">
+                  <td className="px-2 py-2 font-bold">{pick(row, "cloCode", "CloCode")}</td>
+                  {types.map((t) => {
+                    const typeId = pick(t, "assessmentTypeId", "AssessmentTypeId");
+                    const cell = cells.find(
+                      (c) => Number(pick(c, "assessmentTypeId", "AssessmentTypeId")) === Number(typeId)
+                    );
+                    const pct = pick(cell, "percentage", "Percentage");
+                    return (
+                      <td key={typeId} className="px-2 py-2 text-center">
+                        {pct != null ? Number(pct) : "–"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  const exams = pick(details, "exams", "Exams") || [];
+  if (exams.length) {
+    return (
+      <div className="mt-4 max-h-80 space-y-3 overflow-auto">
+        {exams.map((exam) => (
+          <div
+            key={pick(exam, "assessmentId", "AssessmentId")}
+            className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5"
+          >
+            <p className="text-sm font-bold text-gray-900">
+              {pick(exam, "title", "Title")}{" "}
+              {pick(exam, "totalMarks", "TotalMarks") != null
+                ? `· ${pick(exam, "totalMarks", "TotalMarks")} marks`
+                : ""}
+            </p>
+            {(pick(exam, "questions", "Questions") || []).map((q, idx) => {
+              const cloCodes = pick(q, "cloCodes", "CloCodes") || [];
+              return (
+              <p key={idx} className="mt-1 text-xs text-gray-700">
+                <span className="font-semibold">{pick(q, "questionNo", "QuestionNo")}: </span>
+                {pick(q, "questionText", "QuestionText")}
+                {pick(q, "marks", "Marks") != null ? ` (${pick(q, "marks", "Marks")} marks)` : ""}
+                {cloCodes.length ? ` · ${cloCodes.join(", ")}` : ""}
+              </p>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <p className="mt-4 text-sm text-gray-500">
+      No detailed payload for this content type ({pick(details, "itemCount", "ItemCount") ?? 0}{" "}
+      item(s)).
+    </p>
+  );
+}
 
 export default function HodCloApprovalsScreen() {
   const { user } = useContext(AuthContext);
@@ -25,6 +205,9 @@ export default function HodCloApprovalsScreen() {
   const [rejectType, setRejectType] = useState("clo"); // "clo" or "submission"
   const [rejectReason, setRejectReason] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsData, setDetailsData] = useState(null);
 
   const loadPending = useCallback(async () => {
     try {
@@ -112,6 +295,30 @@ export default function HodCloApprovalsScreen() {
     setRejectReason("");
   };
 
+  const openSubmissionDetails = async (item) => {
+    if (!hodUserId) {
+      showAlert("Error", "HOD user not found.");
+      return;
+    }
+    setDetailsOpen(item);
+    setDetailsData(null);
+    setDetailsLoading(true);
+    try {
+      const data = await getHodSubmissionDetails(item.submissionId, hodUserId);
+      setDetailsData(data);
+    } catch (error) {
+      showAlert("Details", error.message);
+      setDetailsOpen(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeDetails = () => {
+    setDetailsOpen(null);
+    setDetailsData(null);
+  };
+
   const closeRejectDialog = () => {
     setRejectTarget(null);
     setRejectReason("");
@@ -151,11 +358,14 @@ export default function HodCloApprovalsScreen() {
 
   return (
     <div className="min-h-full bg-page">
-      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <h1 className="text-xl font-semibold text-gray-900">Approvals & Review Queue</h1>
-        <p className="mt-0.5 text-xs text-gray-500">
-          Review CLOs, CLO-PLO mappings, Task-CLO mappings, and course submissions.
-        </p>
+      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
+        <PageBackButton className="mt-0.5 shrink-0" />
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Approvals & Review Queue</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Review CLOs, CLO-PLO mappings, Task-CLO mappings, and course submissions.
+          </p>
+        </div>
       </div>
 
       <div className="w-full px-4 pb-8 pt-4 sm:px-6 lg:px-8 space-y-6">
@@ -211,6 +421,14 @@ export default function HodCloApprovalsScreen() {
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40 disabled:opacity-50"
+                            onClick={() => openSubmissionDetails(item)}
+                          >
+                            View details
+                          </button>
                           <button
                             type="button"
                             disabled={busy}
@@ -324,6 +542,48 @@ export default function HodCloApprovalsScreen() {
         )}
       </div>
 
+      {detailsOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+          role="presentation"
+          onClick={closeDetails}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-gray-900">
+              {detailsOpen.contentTypeName || detailsOpen.contentTypeCode || "Submission"}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {detailsOpen.courseTitle}
+              {detailsOpen.submittedByName ? ` · ${detailsOpen.submittedByName}` : ""}
+            </p>
+            {detailsLoading ? (
+              <div className="flex justify-center py-12">
+                <div
+                  className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-transparent"
+                  style={{ borderTopColor: theme.colors.primary }}
+                />
+              </div>
+            ) : (
+              <SubmissionDetailsBody details={detailsData} />
+            )}
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
+                onClick={closeDetails}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {rejectTarget ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
@@ -336,18 +596,20 @@ export default function HodCloApprovalsScreen() {
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-gray-900">
-              Reject {rejectType === "clo" ? "CLOs" : rejectTarget.contentTypeName || "Submission"}
-            </h2>
+            <h2 className="text-lg font-bold text-gray-900">Review</h2>
             <p className="mt-2 text-sm text-gray-600">
-              Tell the teacher why {rejectTarget.courseTitle} submission was rejected.
+              Write the reason so the teacher can see why {rejectTarget.courseTitle} was rejected.
             </p>
-            <textarea
-              className="mt-4 min-h-[100px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm"
-              placeholder="Rejection reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-            />
+            <label className="mt-4 block text-sm font-semibold text-gray-800">
+              Reason
+              <textarea
+                className="mt-2 min-h-[100px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal"
+                placeholder="Write why you are rejecting this…"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                autoFocus
+              />
+            </label>
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"

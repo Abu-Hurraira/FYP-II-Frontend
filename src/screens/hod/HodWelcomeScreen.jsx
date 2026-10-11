@@ -2,18 +2,38 @@ import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } 
 import { useNavigate } from "react-router-dom";
 import {
   deduplicateHodCourses,
-  enrichHodCoursesProgress,
   getHodDashboardCoursesPage,
   getOfferedCoursesFallbackPage,
 } from "../../api/hodApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import DashboardWelcomeBanner from "../../components/DashboardWelcomeBanner.jsx";
-import theme from "../../styles/theme";
-import { folderStatusLabel, progressBarColor } from "../../utils/weeklyProgressHelpers";
+import AppSelect from "../../components/AppSelect.jsx";
+import { folderStatusLabel } from "../../utils/weeklyProgressHelpers";
 import { showAlert } from "../../utils/dialogs";
 import { getAuthDisplayName } from "../../utils/helpers";
 
 const PAGE_SIZE = 12;
+const COURSES_CACHE_KEY = "hodWelcomeCoursesCache.v4";
+
+function readCoursesCache() {
+  try {
+    const raw = sessionStorage.getItem(COURSES_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.items) || parsed.items.length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCoursesCache(payload) {
+  try {
+    sessionStorage.setItem(COURSES_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore storage issues
+  }
+}
 
 const AVATAR_PALETTES = [
   { gradient: "from-emerald-600 to-teal-500", bar: "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]", text: "text-emerald-400" },
@@ -143,15 +163,38 @@ function CourseMonitorCard({ course, onOpen, onWeekly }) {
   );
 }
 
+function CourseMonitorCardSkeleton() {
+  return (
+    <article className="flex animate-pulse flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-[#1b2c2e] dark:bg-[#0d181a]">
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-11 w-11 shrink-0 rounded-full bg-gray-200 dark:bg-gray-800" />
+            <div className="min-w-0">
+              <div className="h-4 w-28 rounded bg-gray-200 dark:bg-gray-800" />
+              <div className="mt-2 h-3 w-16 rounded bg-gray-100 dark:bg-gray-800/80" />
+            </div>
+          </div>
+          <div className="h-5 w-16 rounded-full bg-gray-200 dark:bg-gray-800" />
+        </div>
+        <div className="mt-4 h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-800" />
+        <div className="mt-3 h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800" />
+      </div>
+      <div className="mt-5 h-8 w-full rounded-xl bg-gray-100 dark:bg-gray-800/80" />
+    </article>
+  );
+}
+
 export default function HodWelcomeScreen() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cachedFirstPage = useMemo(() => readCoursesCache(), []);
+  const [courses, setCourses] = useState(() => cachedFirstPage?.items ?? []);
+  const [loading, setLoading] = useState(() => !cachedFirstPage?.items?.length);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(cachedFirstPage?.page ?? 0);
+  const [hasMore, setHasMore] = useState(cachedFirstPage?.hasMore ?? true);
+  const [totalCount, setTotalCount] = useState(cachedFirstPage?.totalCount ?? 0);
 
   const [search, setSearch] = useState(() => {
     try {
@@ -193,7 +236,6 @@ export default function HodWelcomeScreen() {
       const requestId = ++requestIdRef.current;
 
       if (replace) {
-        setLoading(true);
         setHasMore(true);
       } else {
         if (loadingMoreRef.current) return;
@@ -208,6 +250,8 @@ export default function HodWelcomeScreen() {
             page: nextPage,
             pageSize: PAGE_SIZE,
             search: searchTerm,
+            lite: false,
+            hodUserId: user?.userId,
           });
         } catch {
           result = await getOfferedCoursesFallbackPage({
@@ -221,45 +265,33 @@ export default function HodWelcomeScreen() {
 
         setCourses((prev) => (replace ? result.items : mergeCourses(prev, result.items)));
         setPage(result.page);
-        setHasMore(result.hasMore);
-        setTotalCount(result.totalCount);
+        setHasMore(Boolean(result.hasMore));
+        setTotalCount(result.totalCount ?? result.items.length);
+        setLoading(false);
+        setLoadingMore(false);
+        loadingMoreRef.current = false;
 
-        const needsProgress = result.items.some((c) => c.progressLoading);
-        if (needsProgress) {
-          await enrichHodCoursesProgress(result.items, {
-            concurrency: 3,
-            onProgress: (updated) => {
-              if (requestId !== requestIdRef.current) return;
-              setCourses((prev) => {
-                const byId = new Map(updated.map((c) => [c.offeredCourseId, c]));
-                return prev.map((c) => byId.get(c.offeredCourseId) ?? c);
-              });
-            },
+        if (replace && !searchTerm && result.items.length > 0) {
+          writeCoursesCache({
+            items: result.items,
+            page: result.page,
+            hasMore: result.hasMore,
+            totalCount: result.totalCount,
           });
         }
       } catch (error) {
         if (requestId === requestIdRef.current) {
           showAlert("Error", error.message);
-          if (replace) {
-            setCourses([]);
-            setHasMore(false);
-            setTotalCount(0);
-          }
-        }
-      } finally {
-        if (requestId === requestIdRef.current) {
           setLoading(false);
           setLoadingMore(false);
           loadingMoreRef.current = false;
         }
       }
     },
-    [mergeCourses]
+    [mergeCourses, user?.userId]
   );
 
   useEffect(() => {
-    setCourses([]);
-    setPage(0);
     loadPage(1, { replace: true, searchTerm: debouncedSearch });
   }, [debouncedSearch, loadPage]);
 
@@ -351,7 +383,7 @@ export default function HodWelcomeScreen() {
             </div>
 
             {/* Program Dropdown */}
-            <select
+            <AppSelect
               value={selectedProgram}
               onChange={(e) => setSelectedProgram(e.target.value)}
               className="rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 outline-none dark:border-[#1b2c2e] dark:bg-[#0d181a] dark:text-gray-200"
@@ -361,10 +393,10 @@ export default function HodWelcomeScreen() {
                   {opt}
                 </option>
               ))}
-            </select>
+            </AppSelect>
 
             {/* Status Dropdown */}
-            <select
+            <AppSelect
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 outline-none dark:border-[#1b2c2e] dark:bg-[#0d181a] dark:text-gray-200"
@@ -373,7 +405,7 @@ export default function HodWelcomeScreen() {
               <option value="Open">Open</option>
               <option value="Submitted">Submitted</option>
               <option value="Pending">Pending</option>
-            </select>
+            </AppSelect>
 
             {/* Search Input */}
             <div className="w-full sm:w-64">
@@ -390,13 +422,10 @@ export default function HodWelcomeScreen() {
 
         {/* Courses Cards List/Grid */}
         <div className="mt-5">
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <div
-                className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-transparent"
-                style={{ borderTopColor: theme.colors.primary }}
-              />
-            </div>
+          {loading && courses.length === 0 ? (
+            <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+              Loading courses…
+            </p>
           ) : (
             <>
               <div className={viewMode === "grid" ? "grid gap-5 sm:grid-cols-2 xl:grid-cols-3" : "space-y-3"}>
@@ -421,11 +450,10 @@ export default function HodWelcomeScreen() {
               <div ref={sentinelRef} className="h-8 w-full" aria-hidden />
 
               {loadingMore && (
-                <div className="flex justify-center py-6">
-                  <div
-                    className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-transparent"
-                    style={{ borderTopColor: theme.colors.primary }}
-                  />
+                <div className={viewMode === "grid" ? "mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3" : "mt-3 space-y-3"}>
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <CourseMonitorCardSkeleton key={`more-${i}`} />
+                  ))}
                 </div>
               )}
 

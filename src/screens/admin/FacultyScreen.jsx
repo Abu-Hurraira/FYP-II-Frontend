@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { AuthContext } from "../../context/AuthContext.jsx";
@@ -6,9 +6,32 @@ import { createUser, deleteUser, getFaculty, importFacultyFromExcel, updateUser 
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
+import AppSelect from "../../components/AppSelect.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
+import { ROLE_IDS } from "../../utils/constants";
 
-const DEFAULT_TEACHER_ROLE_ID = 3;
+const FACULTY_ROLES = [
+  { roleId: ROLE_IDS.TEACHER, label: "Teacher" },
+  { roleId: ROLE_IDS.HOD, label: "HOD" },
+];
+
+function facultyRoleId(item) {
+  const id = Number(item?.roleId ?? item?.RoleId);
+  return id === ROLE_IDS.HOD ? ROLE_IDS.HOD : ROLE_IDS.TEACHER;
+}
+
+const STANDARD_RANKS = [
+  "Lecturer",
+  "Assistant Professor",
+  "Associate Professor",
+  "Professor",
+  "HoD",
+  "HoD & Assistant Professor",
+  "HoD & Associate Professor",
+  "HoD Math & Assistant Professor",
+  "HoD Software Engineering & Assistant Professor",
+  "Deputy Director & HoD CS",
+];
 
 const FacultyScreen = () => {
   const { user } = useContext(AuthContext);
@@ -22,6 +45,7 @@ const FacultyScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rank, setRank] = useState("");
+  const [roleId, setRoleId] = useState(ROLE_IDS.TEACHER);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
@@ -41,12 +65,23 @@ const FacultyScreen = () => {
     loadFaculty();
   }, []);
 
+  const rankOptions = useMemo(() => {
+    const options = new Set(STANDARD_RANKS);
+    faculty.forEach((item) => {
+      const value = String(item?.rank || item?.Rank || "").trim();
+      if (value) options.add(value);
+    });
+    if (rank) options.add(rank);
+    return Array.from(options);
+  }, [faculty, rank]);
+
   const resetForm = () => {
     setEditingUser(null);
     setFullName("");
     setEmail("");
     setPassword("");
     setRank("");
+    setRoleId(ROLE_IDS.TEACHER);
     setSelectedFile(null);
   };
 
@@ -60,7 +95,8 @@ const FacultyScreen = () => {
     setFullName(item.fullName || "");
     setEmail(item.email || "");
     setPassword("");
-    setRank(item.rank || "");
+    setRank(item.rank || item.Rank || "");
+    setRoleId(facultyRoleId(item));
     setFormVisible(true);
   };
 
@@ -82,6 +118,10 @@ const FacultyScreen = () => {
       showAlert("Validation Error", "Password is required.");
       return false;
     }
+    if (Number(roleId) !== ROLE_IDS.TEACHER && Number(roleId) !== ROLE_IDS.HOD) {
+      showAlert("Validation Error", "Select Teacher or HOD.");
+      return false;
+    }
     return true;
   };
 
@@ -92,7 +132,7 @@ const FacultyScreen = () => {
       fullName: fullName.trim(),
       email: email.trim(),
       password: password.trim(),
-      roleId: editingUser ? editingUser.roleId : DEFAULT_TEACHER_ROLE_ID,
+      roleId: Number(roleId),
       rank: rank.trim() || null,
       aridNo: null,
     };
@@ -149,7 +189,7 @@ const FacultyScreen = () => {
       const result = await importFacultyFromExcel(selectedFile);
       showAlert(
         "Import Completed",
-        `Inserted: ${result.insertedCount}\nSkipped: ${result.skippedCount}\nErrors: ${result.errorCount}`
+        `Inserted: ${result.insertedCount ?? result.InsertedCount ?? 0}\nSkipped: ${result.skippedCount ?? result.SkippedCount ?? 0}\nErrors: ${result.errorCount ?? result.ErrorCount ?? 0}`
       );
       setUploadVisible(false);
       setSelectedFile(null);
@@ -187,7 +227,10 @@ const FacultyScreen = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">{item.fullName}</p>
                   <p className="mt-0.5 text-xs text-gray-600">{item.email}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">{item.rank || item.roleName}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {item.roleName ?? item.RoleName ?? (facultyRoleId(item) === ROLE_IDS.HOD ? "HOD" : "Teacher")}
+                    {item.rank || item.Rank ? ` · ${item.rank || item.Rank}` : ""}
+                  </p>
                 </div>
                 <ListRowActions
                   onEdit={() => openEditModal(item)}
@@ -214,13 +257,36 @@ const FacultyScreen = () => {
               </button>
             </div>
             <label className="text-sm font-extrabold">{editingUser ? "Change Name" : "Full Name"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Enter full name" />
+            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Mohsin Ali" />
             <label className="text-sm font-extrabold">{editingUser ? "Change mail" : "Email"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g mohsin@biit.edu.pk" />
+            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. mohsin@biit.edu.pk" />
             <label className="text-sm font-extrabold">{editingUser ? "Change password" : "Password"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingUser ? "new password" : "Enter Password"} />
+            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingUser ? "e.g. New password (optional)" : "e.g. Teacher@123"} />
+            <label className="text-sm font-extrabold">{editingUser ? "Change Role" : "Role"}</label>
+            <AppSelect
+              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2"
+              value={String(roleId)}
+              onChange={(e) => setRoleId(Number(e.target.value))}
+            >
+              {FACULTY_ROLES.map((option) => (
+                <option key={option.roleId} value={option.roleId}>
+                  {option.label}
+                </option>
+              ))}
+            </AppSelect>
             <label className="text-sm font-extrabold">{editingUser ? "Change Rank" : "Rank"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2" value={rank} onChange={(e) => setRank(e.target.value)} placeholder={editingUser ? "New Rank" : "e.g Assistant Professor"} />
+            <AppSelect
+              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2"
+              value={rank}
+              onChange={(e) => setRank(e.target.value)}
+            >
+              <option value="">Select rank</option>
+              {rankOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </AppSelect>
             {!editingUser && (
               <button
                 type="button"

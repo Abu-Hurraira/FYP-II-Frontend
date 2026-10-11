@@ -30,6 +30,31 @@ function SidebarIconShield() {
   );
 }
 
+function SidebarIconFolder() {
+  return (
+    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  );
+}
+
+function SidebarIconAcademic() {
+  return (
+    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+    </svg>
+  );
+}
+
+function SidebarIconUserCheck() {
+  return (
+    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
 export default function AdminLayout() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -62,9 +87,17 @@ export default function AdminLayout() {
             <SidebarIconUsers />
             Faculty
           </NavLink>
-          <NavLink to="/admin/audit" className={sidebarNavClass}>
+          <NavLink to="/admin/programs" className={sidebarNavClass}>
+            <SidebarIconFolder />
+            Programs & Sessions
+          </NavLink>
+          <NavLink to="/admin/enrollment" className={sidebarNavClass}>
+            <SidebarIconUserCheck />
+            Enrollment
+          </NavLink>
+          <NavLink to="/admin/grader-allocations" className={sidebarNavClass}>
             <SidebarIconShield />
-            Audit
+            Graders
           </NavLink>
         </nav>
 

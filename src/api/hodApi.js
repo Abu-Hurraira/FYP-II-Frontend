@@ -1,6 +1,8 @@
 import request from "./apiClient";
-import { getOfferedCourses } from "./offeredCoursesApi";
+import { getOfferedCourses, getOfferedCoursesBySession } from "./offeredCoursesApi";
+import { getSessions } from "./sessionsApi";
 import { getWeeklyContentShared } from "./teacherApi";
+import { asList } from "../utils/helpers";
 import { computeWeeklyProgressFromWeeks, folderStatusLabel } from "../utils/weeklyProgressHelpers";
 
 function courseDedupeKey(course) {
@@ -74,6 +76,7 @@ function normalizeDashboardCourse(raw) {
     hasWeeklyContent: raw.hasWeeklyContent ?? raw.HasWeeklyContent ?? false,
     progressLoading: raw.progressLoading ?? false,
     folderStatus: raw.folderStatus ?? raw.FolderStatus ?? "",
+    reviewStatus: raw.reviewStatus ?? raw.ReviewStatus ?? "",
     isLocked:
       raw.isLocked ??
       raw.IsLocked ??
@@ -109,14 +112,22 @@ const EMPTY_PROGRESS = {
 };
 
 /** Fast paginated list — progress computed server-side for the current page only. */
-export async function getHodDashboardCoursesPage({ page = 1, pageSize = 12, search = "" } = {}) {
+export async function getHodDashboardCoursesPage({
+  page = 1,
+  pageSize = 12,
+  search = "",
+  lite = false,
+  hodUserId,
+} = {}) {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
   });
   if (search?.trim()) params.set("search", search.trim());
+  if (lite) params.set("lite", "true");
+  if (hodUserId != null && hodUserId !== "") params.set("hodUserId", String(hodUserId));
 
-  const data = await request(`/HodDashboard/courses?${params.toString()}`);
+  const data = await request(`/HodDashboard/courses?${params.toString()}`, { timeoutMs: 12000 });
   const itemsRaw = Array.isArray(data) ? data : data?.items ?? data?.Items ?? [];
   const items = itemsRaw.map((c) => normalizeDashboardCourse({ ...c, progressLoading: false }));
 
@@ -145,8 +156,24 @@ export async function getHodDashboardCoursesList() {
  * Still avoids loading progress for every course at once.
  */
 export async function getOfferedCoursesFallbackPage({ page = 1, pageSize = 12, search = "" } = {}) {
-  const offered = await getOfferedCourses();
-  const list = (Array.isArray(offered) ? offered : []).map((c) =>
+  let offered = [];
+  try {
+    offered = asList(await getOfferedCourses());
+  } catch {
+    offered = [];
+  }
+
+  if (offered.length === 0) {
+    const sessions = asList(await getSessions().catch(() => []));
+    const batches = await Promise.all(
+      sessions.map((session) =>
+        getOfferedCoursesBySession(session.sessionId ?? session.SessionId).catch(() => [])
+      )
+    );
+    offered = batches.flatMap((rows) => asList(rows));
+  }
+
+  const list = offered.map((c) =>
     normalizeDashboardCourse({ ...c, ...EMPTY_PROGRESS, progressLoading: true })
   );
 
@@ -190,7 +217,12 @@ export async function getHodSubmittedFolders(hodUserId) {
       isFolderLocked: true,
       folderStatus: item.folderStatus ?? item.FolderStatus ?? "Submitted",
     }),
-    reviewStatus: item.reviewStatus ?? item.ReviewStatus ?? "Pending",
+    reviewStatus:
+      item.reviewStatus ??
+      item.ReviewStatus ??
+      (String(item.folderStatus ?? item.FolderStatus ?? "").toLowerCase() === "approved"
+        ? "Approved"
+        : "Pending"),
     overallProgressPercent:
       item.overallProgressPercent ?? item.OverallProgressPercent ?? 0,
     submittedAt: item.submittedAt ?? item.SubmittedAt ?? null,

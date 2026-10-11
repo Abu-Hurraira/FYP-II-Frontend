@@ -1,12 +1,13 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
-import { getHodUploadAllocation, saveHodUploadAllocation } from "../../api/hodUploadAllocationApi";
+import { clearHodUploadAllocation, getHodUploadAllocation, saveHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { getOfferedCourses } from "../../api/offeredCoursesApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import { UPLOAD_ALLOCATION_TYPES, EMPTY_UPLOAD_ALLOCATION_ROW } from "../../constants/uploadAllocationTypes";
 import theme from "../../styles/theme";
-import { showAlert } from "../../utils/dialogs";
+import { showAlert, showConfirm } from "../../utils/dialogs";
 import {
-  buildAllocationsForSave,
+  buildSectionAAllocations,
+  countVisibleTicks,
   normalizeAllocationRow,
   rowHasAnyPermission,
 } from "../../utils/hodUploadAllocationStorage";
@@ -53,20 +54,24 @@ export default function HodAllocationScreen() {
   const [configured, setConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [coursesRaw, config] = await Promise.all([
+      const [coursesRaw, apiConfig] = await Promise.all([
         getOfferedCourses(),
-        getHodUploadAllocation(),
+        getHodUploadAllocation().catch(() => ({ configured: false, allocations: {} })),
       ]);
       const courses = sortOfferedCourses(
         (Array.isArray(coursesRaw) ? coursesRaw : []).map(normalizeOfferedCourse)
       );
+      const config = apiConfig?.allocations
+        ? apiConfig
+        : { configured: false, allocations: {} };
       const loadedRows = buildRowsFromConfig(courses, config);
       setOfferedCourses(courses);
-      setConfigured(Boolean(config?.configured));
+      setConfigured(Boolean(config?.configured) || countVisibleTicks(courses, config.allocations) > 0);
       setRows(loadedRows);
       setSavedRows(loadedRows);
     } catch (error) {
@@ -111,29 +116,71 @@ export default function HodAllocationScreen() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const allocations = buildAllocationsForSave(offeredCourses, rows);
-      const hadManualEdits = Object.values(rows).some((row) => rowHasAnyPermission(row));
-
-      const saved = await saveHodUploadAllocation({
-        configured: true,
+      const hasManual = offeredCourses.some((course) =>
+        rowHasAnyPermission(rows[String(course.offeredCourseId)])
+      );
+      const allocations = hasManual
+        ? Object.fromEntries(
+            offeredCourses
+              .map((course) => {
+                const id = String(course.offeredCourseId);
+                return [id, normalizeAllocationRow(rows[id])];
+              })
+              .filter(([id]) => id && id !== "undefined")
+          )
+        : buildSectionAAllocations(offeredCourses);
+      const allocatedCount = countVisibleTicks(offeredCourses, allocations);
+      const nextRows = buildRowsFromConfig(offeredCourses, {
+        configured: allocatedCount > 0,
         allocations,
       });
-
-      const nextRows = buildRowsFromConfig(offeredCourses, saved);
-      setConfigured(true);
+      setConfigured(allocatedCount > 0);
       setRows(nextRows);
       setSavedRows(nextRows);
 
+      await saveHodUploadAllocation({
+        configured: allocatedCount > 0,
+        allocations,
+      }, user?.userId ?? user?.UserId);
+
       showAlert(
         "Saved",
-        hadManualEdits
-          ? "Allocation saved. Unselected courses use Section A by default; single-section courses are fully allocated."
-          : "Section A teacher (or the only section) for each course was allocated all upload types."
+        hasManual
+          ? `Allocation saved for ${allocatedCount} section${allocatedCount === 1 ? "" : "s"}.`
+          : `The first A section of each course was allocated (${allocatedCount} section${allocatedCount === 1 ? "" : "s"}).`
       );
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRemoveAll = async () => {
+    if (
+      !(await showConfirm(
+        "Remove allocation",
+        "Remove allocation from every course and section? Teachers will not be able to upload until you allocate again."
+      ))
+    ) {
+      return;
+    }
+
+    try {
+      setRemoving(true);
+      const saved = await clearHodUploadAllocation();
+      const nextRows = buildRowsFromConfig(offeredCourses, {
+        configured: false,
+        allocations: {},
+      });
+      setConfigured(Boolean(saved?.configured) && Object.values(saved.allocations || {}).some(rowHasAnyPermission));
+      setRows(nextRows);
+      setSavedRows(nextRows);
+      showAlert("Removed", "Allocation removed from all courses.");
+    } catch (error) {
+      showAlert("Error", error.message);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -147,18 +194,29 @@ export default function HodAllocationScreen() {
               {user?.fullName || user?.name || "HOD"} · Assign upload responsibilities
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              Tick CLOs, Mid, Final, or Folder Template per teacher. Other courses auto-allocate Section A on
-              save. Single-section courses are always fully allocated.
+              Click Save with no ticks to auto-allocate the <strong>first A section</strong> of each
+              course (e.g. Adv Database → BSAI-6A only). Tick rows yourself to allocate other sections.
+              After an allocated teacher saves, other sections of the same course can view the files.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="app-btn-primary rounded-2xl px-5 py-2.5 text-sm disabled:opacity-60"
-          >
-            {saving ? "Saving…" : "Save Allocation"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRemoveAll}
+              disabled={saving || removing || loading || offeredCourses.length === 0}
+              className="rounded-2xl border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+            >
+              {removing ? "Removing…" : "Remove Allocation"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || removing || loading}
+              className="app-btn-primary rounded-2xl px-5 py-2.5 text-sm disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save Allocation"}
+            </button>
+          </div>
         </div>
         {configured ? (
           <p className="mt-2 text-xs font-semibold text-blue-700">
@@ -166,7 +224,7 @@ export default function HodAllocationScreen() {
           </p>
         ) : (
           <p className="mt-2 text-xs text-amber-700">
-            Not saved yet — teachers currently have full upload access until you save.
+            Nothing allocated yet. Click Save to auto-assign the first A section of each course, or tick rows yourself.
           </p>
         )}
       </div>

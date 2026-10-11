@@ -48,7 +48,15 @@ export default function LoggedInUserBar({
 
   useEffect(() => {
     loadUnread();
-  }, [loadUnread, location.pathname]);
+    if (!notificationsPath || !userId) return undefined;
+    const timer = window.setInterval(loadUnread, 20000);
+    const onFocus = () => loadUnread();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadUnread, location.pathname, notificationsPath, userId]);
 
   const initial = displayName.charAt(0).toUpperCase() || "U";
 
@@ -65,7 +73,7 @@ export default function LoggedInUserBar({
         >
           <BellIcon />
           {unreadCount > 0 ? (
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+            <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
           ) : null}
         </Link>
       ) : null}

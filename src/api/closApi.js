@@ -1,4 +1,4 @@
-import request, { API_BASE_URL } from "./apiClient";
+import request from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
 
 function withQuery(path, params = {}) {
@@ -12,41 +12,58 @@ function withQuery(path, params = {}) {
 
 export const getCLOsByProgramCourse = async (
   programCourseId,
-  { includeArchived = false, offeredCourseId } = {}
+  { includeArchived = false, offeredCourseId, teacherUserId, sessionId } = {}
 ) => {
+  if (teacherUserId == null || teacherUserId === "") {
+    throw new Error("teacherUserId is required to load CLOs.");
+  }
   return await request(
-    withQuery(`/CLOs/by-program-course/${programCourseId}`, {
-      includeArchived: includeArchived ? "true" : undefined,
+    withQuery(`/CLOs/program-course/${programCourseId}`, {
       offeredCourseId,
+      teacherUserId,
+      sessionId,
     })
   );
 };
 
 export const createCLO = async (clo) => {
-  return await request("/CLOs", {
+  const programCourseId = clo.programCourseId;
+  return await request(`/CLOs/program-course/${programCourseId}`, {
     method: "POST",
-    body: JSON.stringify(clo),
+    body: JSON.stringify({
+      teacherUserId: clo.teacherUserId,
+      offeredCourseId: clo.offeredCourseId,
+      sessionId: clo.sessionId,
+      cloCode: clo.cloCode,
+      cloDescription: clo.cloDescription,
+    }),
   });
 };
 
-export const updateCLO = async (cloId, clo, { archiveId, offeredCourseId } = {}) => {
-  const base = archiveId != null ? `/CLOs/archive/${archiveId}` : `/CLOs/${cloId}`;
-  return await request(withQuery(base, { offeredCourseId }), {
-    method: "PUT",
-    body: JSON.stringify(clo),
-  });
+export const updateCLO = async (cloId, clo, { archiveId, offeredCourseId, teacherUserId } = {}) => {
+  // Archive catalog edits use OutcomeCatalogVersions; live CLO rows use /CLOs/{id}.
+  const base = `/CLOs/${cloId}`;
+  return await request(
+    withQuery(base, {
+      offeredCourseId,
+      teacherUserId: teacherUserId ?? clo?.teacherUserId,
+    }),
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        teacherUserId: teacherUserId ?? clo?.teacherUserId,
+        cloCode: clo?.cloCode,
+        cloDescription: clo?.cloDescription,
+        offeredCourseId,
+      }),
+    }
+  );
 };
 
-export const deleteCLO = async (cloId, { archiveId, offeredCourseId } = {}) => {
-  const base = archiveId != null ? `/CLOs/archive/${archiveId}` : `/CLOs/${cloId}`;
-  return await request(withQuery(base, { offeredCourseId }), {
+export const deleteCLO = async (cloId, { archiveId, offeredCourseId, teacherUserId } = {}) => {
+  const base = `/CLOs/${cloId}`;
+  return await request(withQuery(base, { offeredCourseId, teacherUserId }), {
     method: "DELETE",
-  });
-};
-
-export const restoreCLOsByProgramCourse = async (programCourseId, { offeredCourseId } = {}) => {
-  return await request(withQuery(`/CLOs/restore-by-program-course/${programCourseId}`, { offeredCourseId }), {
-    method: "POST",
   });
 };
 
@@ -63,24 +80,16 @@ export const submitCLOsForApproval = async (
   );
 };
 
-export const importCLOs = async (programCourseId, file, { offeredCourseId } = {}) => {
+export const importCLOs = async (programCourseId, file, { offeredCourseId, teacherUserId, sessionId } = {}) => {
   const formData = new FormData();
   appendFormFile(formData, "file", file, "clos.xlsx");
+  if (teacherUserId) formData.append("teacherUserId", String(teacherUserId));
+  if (offeredCourseId) formData.append("offeredCourseId", String(offeredCourseId));
+  if (sessionId) formData.append("sessionId", String(sessionId));
 
-  const response = await fetch(
-    `${API_BASE_URL}${withQuery(`/CLOs/import/${programCourseId}`, { offeredCourseId })}`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to import CLOs.");
-  }
-
-  return data;
+  return await request(`/CLOs/program-course/${programCourseId}/import`, {
+    method: "POST",
+    body: formData,
+    timeoutMs: 120000,
+  });
 };

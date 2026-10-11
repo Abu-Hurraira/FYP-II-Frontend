@@ -1,11 +1,12 @@
 import request from "./apiClient";
+import { asList } from "../utils/helpers";
 
 export const getSessions = async () => {
-  return await request("/AcademicSessions");
+  return asList(await request("/AcademicSessions"));
 };
 
 export const getSessionsByProgram = async (programId) => {
-  return await request(`/AcademicSessions/by-program/${programId}`);
+  return asList(await request(`/AcademicSessions/by-program/${programId}`));
 };
 
 export const createSession = async (session) => {

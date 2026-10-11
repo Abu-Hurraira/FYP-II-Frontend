@@ -1,4 +1,4 @@
-import request, { API_BASE_URL } from "./apiClient";
+import request from "./apiClient";
 import { appendFormFile } from "../utils/appendFormFile";
 import { GRADER_ROLE_ID } from "../utils/constants";
 
@@ -77,17 +77,9 @@ export const importFacultyFromExcel = async (file) => {
   const formData = new FormData();
   appendFormFile(formData, "file", file, "faculty.xlsx");
 
-  const response = await fetch(`${API_BASE_URL}/Users/import-faculty`, {
+  return await request("/Users/import-faculty", {
     method: "POST",
     body: formData,
+    timeoutMs: 120000,
   });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to import faculty.");
-  }
-
-  return data;
 };

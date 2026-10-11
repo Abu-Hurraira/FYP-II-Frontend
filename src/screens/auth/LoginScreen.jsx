@@ -42,8 +42,8 @@ const LoginScreen = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("admin@biit.edu.pk");
-  const [password, setPassword] = useState("Admin@BIIT#2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,8 @@ const LoginScreen = () => {
       const response = await loginUser(email.trim(), password);
 
       if (response?.success) {
-        await login(response.user);
+        const accessToken = response.token || response.Token;
+        await login(response.user || response.User, accessToken);
         navigate("/", { replace: true });
       } else {
         showAlert("Login Failed", response?.message || "Invalid login.");

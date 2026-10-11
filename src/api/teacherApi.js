@@ -1,6 +1,7 @@
-import request from "./apiClient";
+import request, { API_BASE_URL, getAuthToken } from "./apiClient";
 import { getOfferedCourses } from "./offeredCoursesApi";
 import { appendFormFile } from "../utils/appendFormFile";
+import { asList } from "../utils/helpers";
 import {
   findSameSubjectPeers,
   normalizeWeeklyContent,
@@ -82,8 +83,63 @@ function normalizeTeacherSynchronizationDto(raw) {
   };
 }
 
+function normalizeTeacherCourseCard(raw) {
+  if (!raw || typeof raw !== "object") return raw;
+  const folderStatus = raw.folderStatus ?? raw.FolderStatus ?? "Open";
+  return {
+    offeredCourseId: raw.offeredCourseId ?? raw.OfferedCourseId,
+    courseId: raw.courseId ?? raw.CourseId,
+    programCourseId: raw.programCourseId ?? raw.ProgramCourseId ?? 0,
+    courseTitle: raw.courseTitle ?? raw.CourseTitle ?? "",
+    courseCode: raw.courseCode ?? raw.CourseCode ?? "",
+    programCode: raw.programCode ?? raw.ProgramCode ?? "",
+    programName: raw.programName ?? raw.ProgramName ?? "",
+    sectionName: raw.sectionName ?? raw.SectionName ?? "",
+    teacherName: raw.teacherName ?? raw.TeacherName ?? "",
+    hasWeeklyContent: raw.hasWeeklyContent ?? raw.HasWeeklyContent ?? false,
+    weeklyProgressPercentage: raw.weeklyProgressPercentage ?? raw.WeeklyProgressPercentage ?? 0,
+    coveredTopics: raw.coveredTopics ?? raw.CoveredTopics ?? 0,
+    totalTopics: raw.totalTopics ?? raw.TotalTopics ?? 0,
+    folderStatus,
+    isLocked: raw.isLocked ?? raw.IsLocked ?? false,
+    reviewStatus: raw.reviewStatus ?? raw.ReviewStatus ?? null,
+  };
+}
+
 export async function getTeacherCourses(teacherUserId) {
-  return await request(`/TeacherDashboard/${teacherUserId}/courses`);
+  const raw = await request(`/TeacherDashboard/${teacherUserId}/courses`);
+  const list = Array.isArray(raw) ? raw : raw?.items ?? raw?.Items ?? [];
+  return list.map(normalizeTeacherCourseCard);
+}
+
+/** Paginated teacher home list with folder status and weekly progress included. */
+export async function getTeacherCoursesPage({ teacherUserId, page = 1, pageSize = 12 } = {}) {
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    pageSize: String(Math.min(Math.max(pageSize, 1), 48)),
+  });
+  const data = await request(`/TeacherDashboard/${teacherUserId}/courses?${params.toString()}`);
+
+  if (Array.isArray(data)) {
+    const start = (Math.max(page, 1) - 1) * pageSize;
+    const items = data.slice(start, start + pageSize).map(normalizeTeacherCourseCard);
+    return {
+      items,
+      page: Math.max(page, 1),
+      pageSize,
+      totalCount: data.length,
+      hasMore: start + pageSize < data.length,
+    };
+  }
+
+  const itemsRaw = data?.items ?? data?.Items ?? [];
+  return {
+    items: itemsRaw.map(normalizeTeacherCourseCard),
+    page: data?.page ?? data?.Page ?? page,
+    pageSize: data?.pageSize ?? data?.PageSize ?? pageSize,
+    totalCount: data?.totalCount ?? data?.TotalCount ?? itemsRaw.length,
+    hasMore: Boolean(data?.hasMore ?? data?.HasMore ?? false),
+  };
 }
 
 /** Merge dashboard + submission course lists so teachers see every assigned course. */
@@ -103,18 +159,21 @@ export function mergeTeacherCourses(...lists) {
 }
 
 export async function getAllTeacherCourses(teacherUserId) {
-  const [dashboard, submission] = await Promise.all([
-    getTeacherCourses(teacherUserId).catch(() => []),
-    getTeacherSubmissionCourses(teacherUserId).catch(() => []),
-  ]);
-  return mergeTeacherCourses(
-    Array.isArray(dashboard) ? dashboard : [],
-    Array.isArray(submission) ? submission : []
-  );
+  try {
+    return mergeTeacherCourses(await getTeacherCourses(teacherUserId));
+  } catch {
+    const submission = await getTeacherSubmissionCourses(teacherUserId).catch(() => []);
+    return mergeTeacherCourses(Array.isArray(submission) ? submission : []);
+  }
 }
 
-export async function getCourseMenu(offeredCourseId) {
-  const raw = await request(`/TeacherDashboard/course-menu/${offeredCourseId}`);
+export async function getCourseMenu(offeredCourseId, teacherUserId) {
+  const qs =
+    teacherUserId != null && teacherUserId !== ""
+      ? `?teacherUserId=${encodeURIComponent(teacherUserId)}`
+      : "";
+  const raw = await request(`/TeacherDashboard/course-menu/${offeredCourseId}${qs}`);
+  const permissions = raw.permissions ?? raw.Permissions ?? {};
   return {
     offeredCourseId: raw.offeredCourseId ?? raw.OfferedCourseId,
     courseId: raw.courseId ?? raw.CourseId,
@@ -123,6 +182,24 @@ export async function getCourseMenu(offeredCourseId) {
     courseCode: raw.courseCode ?? raw.CourseCode ?? "",
     sectionName: raw.sectionName ?? raw.SectionName ?? "",
     teacherName: raw.teacherName ?? raw.TeacherName ?? "",
+    permissions: {
+      canManageClos: Boolean(permissions.canManageClos ?? permissions.CanManageClos),
+      canUploadWeeklyContent: Boolean(
+        permissions.canUploadWeeklyContent ?? permissions.CanUploadWeeklyContent
+      ),
+      canUploadMidExamQuestions: Boolean(
+        permissions.canUploadMidExamQuestions ?? permissions.CanUploadMidExamQuestions
+      ),
+      canUploadFinalExamQuestions: Boolean(
+        permissions.canUploadFinalExamQuestions ?? permissions.CanUploadFinalExamQuestions
+      ),
+      canManageCloPloMapping: Boolean(
+        permissions.canManageCloPloMapping ?? permissions.CanManageCloPloMapping
+      ),
+      canManageCloTaskMapping: Boolean(
+        permissions.canManageCloTaskMapping ?? permissions.CanManageCloTaskMapping
+      ),
+    },
   };
 }
 
@@ -135,6 +212,75 @@ export async function getAssessmentSummary(offeredCourseId, teacherUserId) {
 export async function saveCloTaskCell(programCourseId, payload) {
   return await request(`/CloTaskMappings/program-course/${programCourseId}/cell`, {
     method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getCloTaskMatrix(programCourseId, teacherUserId, offeredCourseId) {
+  return await request(
+    `/CloTaskMappings/program-course/${programCourseId}/matrix?teacherUserId=${teacherUserId || ""}&offeredCourseId=${offeredCourseId || ""}`
+  );
+}
+
+export async function addCloTaskType(programCourseId, payload) {
+  return await request(`/CloTaskMappings/program-course/${programCourseId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeCloTaskType(programCourseId, assessmentTypeId, payload) {
+  return await request(`/CloTaskMappings/program-course/${programCourseId}/tasks/${assessmentTypeId}`, {
+    method: "DELETE",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAssessmentLoadSchemes(offeredCourseId, teacherUserId, assessmentTypeName) {
+  const typeQs = assessmentTypeName
+    ? `&assessmentTypeName=${encodeURIComponent(assessmentTypeName)}`
+    : "";
+  return await request(
+    `/Assessments/offered-course/${offeredCourseId}/load-sources/schemes?teacherUserId=${teacherUserId || ""}${typeQs}`
+  );
+}
+
+export async function getAssessmentLoadSchemeItems(
+  offeredCourseId,
+  sourceSessionId,
+  teacherUserId,
+  assessmentTypeName
+) {
+  const typeQs = assessmentTypeName
+    ? `&assessmentTypeName=${encodeURIComponent(assessmentTypeName)}`
+    : "";
+  return await request(
+    `/Assessments/offered-course/${offeredCourseId}/load-sources/schemes/${sourceSessionId}/items?teacherUserId=${teacherUserId || ""}${typeQs}`
+  );
+}
+
+export async function applyAssessmentLoadScheme(offeredCourseId, payload) {
+  return await request(`/Assessments/offered-course/${offeredCourseId}/load-sources/apply`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getWeeklyLoadSchemes(offeredCourseId, teacherUserId) {
+  return await request(
+    `/TeacherWeeklyContent/${offeredCourseId}/load-sources/schemes?teacherUserId=${teacherUserId || ""}`
+  );
+}
+
+export async function getWeeklyLoadSchemeTopics(offeredCourseId, sourceSessionId, teacherUserId) {
+  return await request(
+    `/TeacherWeeklyContent/${offeredCourseId}/load-sources/schemes/${sourceSessionId}/topics?teacherUserId=${teacherUserId || ""}`
+  );
+}
+
+export async function applyWeeklyLoadScheme(offeredCourseId, payload) {
+  return await request(`/TeacherWeeklyContent/${offeredCourseId}/load-sources/apply`, {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }
@@ -166,15 +312,19 @@ export async function getContentStatuses(programCourseId, teacherUserId, offered
 }
 
 export async function getAssessmentsList(offeredCourseId, teacherUserId, typeName = "Assignment") {
-  return await request(
-    `/Assessments/offered-course/${offeredCourseId}?teacherUserId=${teacherUserId || ""}&assessmentTypeName=${typeName}`
+  return asList(
+    await request(
+      `/Assessments/offered-course/${offeredCourseId}?teacherUserId=${teacherUserId || ""}&assessmentTypeName=${typeName}`
+    )
   );
 }
 
 export async function getAvailableClos(offeredCourseId, teacherUserId, assessmentTypeName) {
   const typeParam = assessmentTypeName ? `&assessmentTypeName=${encodeURIComponent(assessmentTypeName)}` : "";
-  return await request(
-    `/Assessments/offered-course/${offeredCourseId}/available-clos?teacherUserId=${teacherUserId || ""}${typeParam}`
+  return asList(
+    await request(
+      `/Assessments/offered-course/${offeredCourseId}/available-clos?teacherUserId=${teacherUserId || ""}${typeParam}`
+    )
   );
 }
 
@@ -192,9 +342,23 @@ export async function getAssessmentDetail(assessmentId, teacherUserId) {
 }
 
 export async function updateAssessment(assessmentId, payload) {
-  return await request(`/Assessments/${assessmentId}`, {
+  return await request(`/Assessments/${assessmentId}/meta`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function completeAssessmentSetup(assessmentId, teacherUserId) {
+  return await request(`/Assessments/${assessmentId}/complete-setup`, {
+    method: "POST",
+    body: JSON.stringify({ teacherUserId }),
+  });
+}
+
+export async function reopenAssessmentSetup(assessmentId, teacherUserId) {
+  return await request(`/Assessments/${assessmentId}/reopen-setup`, {
+    method: "POST",
+    body: JSON.stringify({ teacherUserId }),
   });
 }
 
@@ -205,33 +369,40 @@ export async function addAssessmentQuestion(assessmentId, payload) {
   });
 }
 
+export async function updateAssessmentQuestion(assessmentId, questionId, payload) {
+  return await request(`/Assessments/${assessmentId}/questions/${questionId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function uploadAssessmentFile(assessmentId, teacherUserId, filePurpose, file) {
   const formData = new FormData();
-  formData.append("teacherUserId", teacherUserId);
+  formData.append("teacherUserId", String(teacherUserId));
   formData.append("filePurpose", filePurpose);
-  formData.append("file", file);
+  appendFormFile(formData, "file", file, file?.name || "assessment-file");
 
-  const response = await fetch(`/api/Assessments/${assessmentId}/files`, {
+  return await request(`/Assessments/${assessmentId}/files`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    },
     body: formData,
+    timeoutMs: 60000,
   });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || "File upload failed.");
-  }
-  return await response.json();
 }
 
-export async function getWeeklyContent(offeredCourseId) {
-  return await request(`/TeacherWeeklyContent/${offeredCourseId}`);
+export async function getWeeklyContent(offeredCourseId, teacherUserId) {
+  const qs =
+    teacherUserId != null && teacherUserId !== ""
+      ? `?teacherUserId=${encodeURIComponent(teacherUserId)}`
+      : "";
+  return await request(`/TeacherWeeklyContent/${offeredCourseId}${qs}`);
 }
 
-export async function loadWeeklyContentFromDatabase(offeredCourseId) {
-  return await request(`/TeacherWeeklyContent/${offeredCourseId}/load-from-database`, {
+export async function loadWeeklyContentFromDatabase(offeredCourseId, teacherUserId) {
+  const qs =
+    teacherUserId != null && teacherUserId !== ""
+      ? `?teacherUserId=${encodeURIComponent(teacherUserId)}`
+      : "";
+  return await request(`/TeacherWeeklyContent/${offeredCourseId}/load-from-database${qs}`, {
     method: "POST",
   });
 }
@@ -241,7 +412,7 @@ export async function loadWeeklyContentFromDatabase(offeredCourseId) {
  * teaching the same subject. Tries own section, DB sync, then sibling sections.
  * Progress always comes from the requested section — never from a peer section.
  */
-export async function getWeeklyContentShared(offeredCourseId) {
+export async function getWeeklyContentShared(offeredCourseId, teacherUserId) {
   const ocId = Number(offeredCourseId);
 
   const finalize = (data, extra = {}) =>
@@ -249,7 +420,7 @@ export async function getWeeklyContentShared(offeredCourseId) {
 
   let primary = null;
   try {
-    primary = finalize(await getWeeklyContent(ocId));
+    primary = finalize(await getWeeklyContent(ocId, teacherUserId));
     if (weeklyContentHasTopics(primary)) {
       return { ...primary, isSharedWeeklyContent: false };
     }
@@ -258,7 +429,7 @@ export async function getWeeklyContentShared(offeredCourseId) {
   }
 
   try {
-    const loaded = finalize(await loadWeeklyContentFromDatabase(ocId));
+    const loaded = finalize(await loadWeeklyContentFromDatabase(ocId, teacherUserId));
     if (weeklyContentHasTopics(loaded)) {
       return { ...loaded, isSharedWeeklyContent: false, loadedFromDatabase: true };
     }
@@ -281,14 +452,14 @@ export async function getWeeklyContentShared(offeredCourseId) {
 
     let peerData = null;
     try {
-      peerData = finalize(await getWeeklyContent(peerId));
+      peerData = finalize(await getWeeklyContent(peerId, teacherUserId));
     } catch {
       continue;
     }
     if (!weeklyContentHasTopics(peerData)) continue;
 
     try {
-      const synced = finalize(await loadWeeklyContentFromDatabase(ocId));
+      const synced = finalize(await loadWeeklyContentFromDatabase(ocId, teacherUserId));
       if (weeklyContentHasTopics(synced)) {
         const peerSection = peer.sectionName ?? peer.SectionName ?? peerData?.sectionName ?? "";
         return {
@@ -303,7 +474,7 @@ export async function getWeeklyContentShared(offeredCourseId) {
     }
 
     try {
-      const ownWithProgress = finalize(await getWeeklyContent(ocId));
+      const ownWithProgress = finalize(await getWeeklyContent(ocId, teacherUserId));
       if (weeklyContentHasTopics(ownWithProgress)) {
         const peerSection = peer.sectionName ?? peer.SectionName ?? peerData?.sectionName ?? "";
         return {
@@ -405,10 +576,21 @@ export async function addWeeklyTopic(offeredCourseId, payload) {
   });
 }
 
-export async function updateTopicProgress(offeredCourseId, topicId, teacherUserId, isCompleted) {
+export async function updateTopicProgress(
+  offeredCourseId,
+  topicId,
+  teacherUserId,
+  isCompleted,
+  alsoOfferedCourseIds = []
+) {
+  const extra = (alsoOfferedCourseIds || []).filter((id) => Number(id) > 0 && Number(id) !== Number(offeredCourseId));
   const result = await request(`/TeacherWeeklyContent/${offeredCourseId}/topics/${topicId}/complete`, {
     method: "PUT",
-    body: JSON.stringify({ teacherUserId, isCompleted }),
+    body: JSON.stringify({
+      teacherUserId,
+      isCompleted,
+      alsoOfferedCourseIds: extra,
+    }),
   });
   return normalizeWeeklyContent({ ...result, offeredCourseId: Number(offeredCourseId) });
 }
@@ -487,14 +669,72 @@ export async function createMasterFolder(offeredCourseId, teacherUserId) {
   );
 }
 
-export async function getFolderFiles(directoryId) {
-  return await request(`/TeacherSubmission/folders/${directoryId}/files`);
+export async function createCustomFolder(offeredCourseId, teacherUserId, folderName) {
+  return await request(`/TeacherSubmission/offered-course/${offeredCourseId}/custom-folders`, {
+    method: "POST",
+    body: JSON.stringify({ teacherUserId, folderName }),
+  });
 }
 
-export async function uploadFileToCourseFolder(directoryId, teacherUserId, fileCategory, file) {
+export async function downloadTeacherFile(fileId, offeredCourseId, fallbackFileName = "download") {
+  const query =
+    Number(fileId) < 0 && offeredCourseId
+      ? `?offeredCourseId=${encodeURIComponent(offeredCourseId)}`
+      : "";
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/TeacherSubmission/files/${fileId}/download${query}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    let message = "Could not download file.";
+    try {
+      const data = await response.json();
+      message = data?.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const basicName = disposition.match(/filename=\"?([^\";]+)\"?/i)?.[1];
+  const fileName = (
+    encodedName ? decodeURIComponent(encodedName) : basicName || fallbackFileName
+  )
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+    .trim();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function getFolderFiles(directoryId, offeredCourseId) {
+  const query =
+    offeredCourseId != null && offeredCourseId !== ""
+      ? `?offeredCourseId=${encodeURIComponent(offeredCourseId)}`
+      : "";
+  return await request(`/TeacherSubmission/folders/${directoryId}/files${query}`);
+}
+
+export async function uploadFileToCourseFolder(
+  directoryId,
+  teacherUserId,
+  fileCategory,
+  file,
+  offeredCourseId
+) {
   const formData = new FormData();
   formData.append("uploadedByUserId", String(teacherUserId));
   formData.append("fileCategory", fileCategory);
+  if (offeredCourseId != null && offeredCourseId !== "") {
+    formData.append("offeredCourseId", String(offeredCourseId));
+  }
   appendFormFile(formData, "file", file, "upload.bin");
 
   return await request(`/TeacherSubmission/folders/${directoryId}/upload`, {
@@ -504,8 +744,12 @@ export async function uploadFileToCourseFolder(directoryId, teacherUserId, fileC
   });
 }
 
-export async function deleteCourseFolderFile(fileId) {
-  return await request(`/TeacherSubmission/files/${fileId}`, {
+export async function deleteCourseFolderFile(fileId, offeredCourseId) {
+  const query =
+    offeredCourseId != null && offeredCourseId !== ""
+      ? `?offeredCourseId=${encodeURIComponent(offeredCourseId)}`
+      : "";
+  return await request(`/TeacherSubmission/files/${fileId}${query}`, {
     method: "DELETE",
   });
 }
@@ -519,6 +763,34 @@ export async function validateCourseFolder(offeredCourseId) {
 export async function submitCourseFolder(offeredCourseId, teacherUserId) {
   return await request(
     `/TeacherSubmission/offered-course/${offeredCourseId}/submit?teacherUserId=${teacherUserId}`,
+    { method: "POST", timeoutMs: 60000 }
+  );
+}
+
+export async function importMainFolderDataToSubmittedFolder(offeredCourseId, teacherUserId) {
+  return await request(
+    `/TeacherSubmission/offered-course/${offeredCourseId}/import-main-data?teacherUserId=${encodeURIComponent(
+      teacherUserId
+    )}`,
+    { method: "POST", timeoutMs: 90000 }
+  );
+}
+
+/** Publishes approved CLO–Task mapping PDF into the master folder. */
+export async function publishSectionToSubmittedFolder(offeredCourseId, teacherUserId, section) {
+  return await request(
+    `/TeacherSubmission/offered-course/${offeredCourseId}/publish-section?teacherUserId=${encodeURIComponent(
+      teacherUserId
+    )}&section=${encodeURIComponent(section)}`,
+    { method: "POST", timeoutMs: 60000 }
+  );
+}
+
+export async function publishCloTaskMappingToFolder(offeredCourseId, teacherUserId) {
+  return await request(
+    `/TeacherSubmission/offered-course/${offeredCourseId}/publish-clo-task-mapping?teacherUserId=${encodeURIComponent(
+      teacherUserId
+    )}`,
     { method: "POST", timeoutMs: 60000 }
   );
 }

@@ -2,10 +2,11 @@ import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getOfferedCourseUploadPermissions } from "../../api/hodUploadAllocationApi";
 import { getCourseMenu } from "../../api/teacherApi";
+import { getCourseFixedScheme } from "../../api/courseResultsApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
-import { canManageClosFromPermissions } from "../../utils/uploadAllocationHelpers";
+import { canManageClosFromPermissions, canManageMidFromPermissions, canManageFinalFromPermissions } from "../../utils/uploadAllocationHelpers";
 
 export default function TeacherCourseMenuScreen() {
   const { user } = useContext(AuthContext);
@@ -21,27 +22,32 @@ export default function TeacherCourseMenuScreen() {
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [uploadPermissions, setUploadPermissions] = useState(null);
+  const [hasLab, setHasLab] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const canManageClos = canManageClosFromPermissions(uploadPermissions);
+  const canManageMid = canManageMidFromPermissions(uploadPermissions);
+  const canManageFinal = canManageFinalFromPermissions(uploadPermissions);
 
   const loadCourse = useCallback(async () => {
     try {
-      const [data, permissions] = await Promise.all([
+      const [data, permissions, scheme] = await Promise.all([
         getCourseMenu(offeredCourseId),
-        getOfferedCourseUploadPermissions(offeredCourseId).catch(() => ({
+        getOfferedCourseUploadPermissions(offeredCourseId, teacherUserId).catch(() => ({
           clos: false,
           configured: false,
         })),
+        getCourseFixedScheme(offeredCourseId, teacherUserId).catch(() => null),
       ]);
       setCourse(data);
       setUploadPermissions(permissions);
+      setHasLab(Boolean(scheme?.hasLab ?? scheme?.HasLab ?? scheme?.fixed?.hasLab ?? scheme?.Fixed?.HasLab));
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
     }
-  }, [offeredCourseId]);
+  }, [offeredCourseId, teacherUserId]);
 
   useEffect(() => {
     loadCourse();
@@ -93,8 +99,11 @@ export default function TeacherCourseMenuScreen() {
         </svg>
       ),
       disabled: false,
+      subtitle: canManageMid
+        ? "Design the paper, then Upload for HOD approval"
+        : "Approved paper only (shared after HOD approves)",
       onPress: () =>
-        navigate(`/teacher/placeholder?title=${encodeURIComponent("Mid Term Exams")}&${teacherQs}`),
+        navigate(`/teacher/course/${offeredCourseId}/mid-exams?${teacherQs}`),
     },
     {
       title: "Final Term Exams",
@@ -105,8 +114,11 @@ export default function TeacherCourseMenuScreen() {
         </svg>
       ),
       disabled: false,
+      subtitle: canManageFinal
+        ? "Design the paper, then Upload for HOD approval"
+        : "Approved paper only (shared after HOD approves)",
       onPress: () =>
-        navigate(`/teacher/placeholder?title=${encodeURIComponent("Final Term Exams")}&${teacherQs}`),
+        navigate(`/teacher/course/${offeredCourseId}/final-exams?${teacherQs}`),
     },
     {
       title: "Assessment",
@@ -120,7 +132,7 @@ export default function TeacherCourseMenuScreen() {
         navigate(`/teacher/course/${offeredCourseId}/assessment?${teacherQs}`),
     },
     {
-      title: "Results",
+      title: "CLO/PLO attainment",
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -128,7 +140,29 @@ export default function TeacherCourseMenuScreen() {
       ),
       disabled: false,
       onPress: () =>
-        navigate(`/teacher/placeholder?title=${encodeURIComponent("Results")}&${teacherQs}`),
+        navigate(`/teacher/course/${offeredCourseId}/results?${teacherQs}`),
+    },
+    {
+      title: "Course Result",
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M7 6h10M7 18h10" />
+        </svg>
+      ),
+      disabled: false,
+      onPress: () =>
+        navigate(`/teacher/course/${offeredCourseId}/course-result?${teacherQs}`),
+    },
+    {
+      title: "Component Marks",
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m-6 4h6m-6 4h4M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
+        </svg>
+      ),
+      disabled: false,
+      onPress: () =>
+        navigate(`/teacher/course/${offeredCourseId}/component-marks?${teacherQs}`),
     },
     {
       title: "CLOs",
@@ -144,17 +178,39 @@ export default function TeacherCourseMenuScreen() {
       onPress: () => navigate(`/teacher/course/${offeredCourseId}/clos?${teacherQs}`),
     },
     {
-      title: "CLO-PLO Mapping",
+      title: "Mappings",
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
       disabled: false,
-      subtitle: canManageClos
-        ? "Edit & Upload CLO-PLO matrix for HOD approval"
-        : "View-only: Approved CLO-PLO matrix",
-      onPress: () => navigate(`/teacher/course/${offeredCourseId}/clo-plo?${teacherQs}`),
+      subtitle: hasLab
+        ? "CLO-PLO, homework marks, and lab marks"
+        : "CLO-PLO and homework marks",
+      onPress: () => navigate(`/teacher/course/${offeredCourseId}/mappings?${teacherQs}`),
+    },
+    {
+      title: "PLO Results",
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      disabled: false,
+      subtitle: "Student-wise PLO % and fail-by-PLO detail",
+      onPress: () => navigate(`/teacher/course/${offeredCourseId}/plo-results?${teacherQs}`),
+    },
+    {
+      title: "FCAR Report",
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      disabled: false,
+      subtitle: "Real-time Faculty Course Assessment Report & live outcome analysis",
+      onPress: () => navigate(`/teacher/course/${offeredCourseId}/fcar-report?${teacherQs}`),
     },
   ];
 

@@ -6,19 +6,28 @@ import {
   createStudent,
   deleteStudent,
   getStudentsBySection,
+  importStudentsBySection,
   updateStudent,
 } from "../../api/studentsApi";
-import {
-  importStudentsFromExcelFile,
-  STUDENT_IMPORT_SAMPLE_ROWS,
-} from "../../utils/studentImportHelpers";
+import { getSectionsBySession } from "../../api/sectionsApi";
+import { STUDENT_IMPORT_SAMPLE_ROWS } from "../../utils/studentImportHelpers";
 import { deleteUser, getGraderUsers } from "../../api/usersApi";
 import { deleteGraderAllocation, getGraderAllocations } from "../../api/graderAllocationsApi";
 import { filterGradersLinkedToStudents, findGraderAllocationForStudent, findGraderUserForStudent, getAssignedTeacherName } from "../../utils/graderHelpers";
+import AppSelect from "../../components/AppSelect.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
+import GraderBadge from "../../components/GraderBadge.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
+
+function pickPositiveId(...values) {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
 
 const SectionAdminStudentsScreen = () => {
   const { user, logout } = useContext(AuthContext);
@@ -37,15 +46,22 @@ const SectionAdminStudentsScreen = () => {
   const [fullName, setFullName] = useState("");
   const [aridNo, setAridNo] = useState("");
   const [email, setEmail] = useState("");
+  const [formSectionId, setFormSectionId] = useState("");
+  const [sessionSections, setSessionSections] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const currentSectionId = pickPositiveId(section?.sectionId, section?.SectionId);
+  const currentSessionId = pickPositiveId(section?.sessionId, section?.SessionId);
+  const currentSectionName = section?.sectionName ?? section?.SectionName ?? "";
 
   const loadStudents = async () => {
-    if (!section?.sectionId) return;
+    if (!currentSectionId) return;
     try {
       setLoading(true);
       const [data, graderData, allocationData] = await Promise.all([
-        getStudentsBySection(section.sectionId),
+        getStudentsBySection(currentSectionId),
         getGraderUsers(),
         getGraderAllocations(),
       ]);
@@ -60,15 +76,30 @@ const SectionAdminStudentsScreen = () => {
     }
   };
 
+  const loadSessionSections = async () => {
+    if (!currentSessionId) {
+      setSessionSections(section ? [section] : []);
+      return;
+    }
+    try {
+      const list = (await getSectionsBySession(currentSessionId)) || [];
+      setSessionSections(list);
+    } catch {
+      setSessionSections(section ? [section] : []);
+    }
+  };
+
   useEffect(() => {
     loadStudents();
-  }, [section?.sectionId]);
+    loadSessionSections();
+  }, [currentSectionId, currentSessionId]);
 
   const resetForm = () => {
     setEditingStudent(null);
     setFullName("");
     setAridNo("");
     setEmail("");
+    setFormSectionId(currentSectionId ? String(currentSectionId) : "");
   };
 
   const openAdd = () => {
@@ -79,41 +110,51 @@ const SectionAdminStudentsScreen = () => {
 
   const openEdit = (item) => {
     setEditingStudent(item);
-    setFullName(item.fullName);
-    setAridNo(item.aridNo);
-    setEmail(item.email || "");
+    setFullName(item.fullName ?? item.FullName ?? "");
+    setAridNo(item.aridNo ?? item.AridNo ?? "");
+    setEmail(item.email ?? item.Email ?? "");
+    setFormSectionId(
+      String(
+        pickPositiveId(item.sectionId, item.SectionId, currentSectionId) || ""
+      )
+    );
     setFormVisible(true);
   };
 
   const saveStudent = async () => {
+    const sectionId = pickPositiveId(formSectionId, currentSectionId);
+    if (!sectionId) {
+      showAlert("Validation Error", "Section is required.");
+      return;
+    }
     if (!fullName.trim()) {
       showAlert("Validation Error", "Student name is required.");
       return;
     }
     if (!aridNo.trim()) {
-      showAlert("Validation Error", "ARID / Roll number is required.");
+      showAlert("Validation Error", "ARID / Registration number is required.");
       return;
     }
+    const payload = {
+      sectionId,
+      fullName: fullName.trim(),
+      aridNo: aridNo.trim(),
+      email: email.trim() || null,
+    };
     try {
+      setSaving(true);
       if (editingStudent) {
-        await updateStudent(editingStudent.studentId, {
-          fullName: fullName.trim(),
-          aridNo: aridNo.trim(),
-          email: email.trim() || null,
-        });
+        await updateStudent(editingStudent.studentId ?? editingStudent.StudentId, payload);
       } else {
-        await createStudent({
-          sectionId: section.sectionId,
-          fullName: fullName.trim(),
-          aridNo: aridNo.trim(),
-          email: email.trim() || null,
-        });
+        await createStudent(payload);
       }
       setFormVisible(false);
       resetForm();
       await loadStudents();
     } catch (error) {
       showAlert("Error", error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -126,19 +167,27 @@ const SectionAdminStudentsScreen = () => {
     if (!(await showConfirm("Delete Student", confirmMessage))) return;
 
     try {
+      await deleteStudent(student.studentId ?? student.StudentId);
+
       if (graderUser?.userId) {
-        const allocations = await getGraderAllocations();
-        const related = (allocations || []).filter(
-          (item) => Number(item.graderUserId) === Number(graderUser.userId)
-        );
-        for (const allocation of related) {
-          await deleteGraderAllocation(allocation.graderAllocationId);
+        try {
+          const graderAllocations = await getGraderAllocations();
+          const related = (graderAllocations || []).filter(
+            (item) => Number(item.graderUserId ?? item.GraderUserId) === Number(graderUser.userId)
+          );
+          for (const allocation of related) {
+            await deleteGraderAllocation(allocation.graderAllocationId ?? allocation.GraderAllocationId);
+          }
+          await deleteUser(graderUser.userId);
+        } catch (graderError) {
+          showAlert(
+            "Student deleted",
+            `The student was removed, but the grader account could not be deleted: ${graderError.message}`
+          );
         }
-        await deleteUser(graderUser.userId);
       }
 
-      await deleteStudent(student.studentId);
-      if (editingStudent?.studentId === student.studentId) {
+      if ((editingStudent?.studentId ?? editingStudent?.StudentId) === (student.studentId ?? student.StudentId)) {
         setFormVisible(false);
         resetForm();
       }
@@ -165,16 +214,26 @@ const SectionAdminStudentsScreen = () => {
     }
     try {
       setUploading(true);
-      const result = await importStudentsFromExcelFile(section.sectionId, selectedFile);
+      const result = await importStudentsBySection(currentSectionId, selectedFile);
+      const inserted = result.insertedCount ?? result.InsertedCount ?? 0;
+      const updated = result.updatedCount ?? result.UpdatedCount ?? 0;
+      const skipped = result.skippedCount ?? result.SkippedCount ?? 0;
+      const errors = result.errors ?? result.Errors ?? [];
+      const warnings = result.warnings ?? result.Warnings ?? [];
       const errorPreview =
-        result.errors && result.errors.length > 0
-          ? `\n\nErrors:\n${result.errors.slice(0, 5).join("\n")}${result.errors.length > 5 ? "\n..." : ""}`
+        errors.length > 0
+          ? `\n\nErrors:\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? "\n..." : ""}`
+          : "";
+      const warningPreview =
+        warnings.length > 0
+          ? `\n\nWarnings:\n${warnings.slice(0, 3).join("\n")}`
           : "";
       showAlert(
         "Import Completed",
-        `Inserted: ${result.insertedCount || 0}
-Skipped: ${result.skippedCount || 0}
-Errors: ${result.errorCount || 0}${errorPreview}`
+        `Inserted: ${inserted}
+Updated: ${updated}
+Skipped: ${skipped}
+Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPreview}`
       );
       setUploadVisible(false);
       setChoiceVisible(false);
@@ -206,7 +265,7 @@ Errors: ${result.errorCount || 0}${errorPreview}`
       <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
         <PageBackButton />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold text-gray-900">{section.sectionName}</h1>
+          <h1 className="truncate text-xl font-semibold text-gray-900">{currentSectionName || "Students"}</h1>
           <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "SectionAdmin"}</p>
         </div>
         <AddHeaderButton label="Add Student" onClick={() => setChoiceVisible(true)} />
@@ -220,15 +279,15 @@ Errors: ${result.errorCount || 0}${errorPreview}`
         ) : (
           <div className="space-y-2.5 pb-24 pt-2">
             {students.map((item) => {
-              const nominatedGrader = !!findGraderUserForStudent(item, graders);
               const graderAllocation = findGraderAllocationForStudent(item, graders, allocations);
               const assignedTeacher = getAssignedTeacherName(graderAllocation);
+              const isAssignedGrader = Boolean(assignedTeacher);
               return (
                 <div
                   key={item.studentId}
                   className="flex items-start gap-3 rounded-2xl border p-4 shadow-sm transition-all"
                   style={
-                    nominatedGrader
+                    isAssignedGrader
                       ? {
                           backgroundColor: "var(--brand-muted)",
                           borderColor: "var(--brand-soft)",
@@ -244,17 +303,7 @@ Errors: ${result.errorCount || 0}${errorPreview}`
                       <p className="text-sm font-bold" style={{ color: "var(--text)" }}>
                         {item.fullName}
                       </p>
-                      {nominatedGrader ? (
-                        <span
-                          className="rounded-full px-2.5 py-0.5 text-xs font-extrabold"
-                          style={{
-                            backgroundColor: "var(--brand-dark)",
-                            color: "#ffffff",
-                          }}
-                        >
-                          Grader
-                        </span>
-                      ) : null}
+                      {isAssignedGrader ? <GraderBadge /> : null}
                     </div>
                     <p className="mt-0.5 text-xs font-semibold" style={{ color: "var(--text)" }}>
                       {item.aridNo}
@@ -264,7 +313,7 @@ Errors: ${result.errorCount || 0}${errorPreview}`
                         {item.email}
                       </p>
                     ) : null}
-                    {nominatedGrader && assignedTeacher ? (
+                    {isAssignedGrader ? (
                       <p className="mt-1.5 text-xs font-bold" style={{ color: "var(--brand)" }}>
                         Assigned to teacher: {assignedTeacher}
                       </p>
@@ -316,30 +365,30 @@ Errors: ${result.errorCount || 0}${errorPreview}`
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
             <h2 className="mb-2 text-center text-lg font-semibold text-gray-900">Upload student list</h2>
             <p className="mb-4 text-center text-sm text-gray-500">
-              Upload inside the section you opened. The <strong>Section</strong> column in the file is ignored — students are added to {section.sectionName}.
+              Upload inside the section you opened. The <strong>Section</strong> column in the file is ignored — students are added to {currentSectionName || "this section"}.
             </p>
 
             <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
               <p className="text-xs font-extrabold uppercase tracking-wide text-gray-600">Supported columns</p>
               <p className="mt-1 text-xs text-gray-500">
-                <strong>Full Name</strong>, <strong>Ardi Number</strong> / ARID, and <strong>Email</strong> (optional)
+                <strong>StuName</strong> (or Full Name), <strong>Reg_no</strong> (or ARID / Ardi Number), and <strong>Email</strong> (optional)
               </p>
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[320px] border-collapse text-left text-xs">
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="py-1.5 pr-2 font-semibold text-gray-700">Section</th>
-                      <th className="py-1.5 pr-2 font-semibold text-gray-700">Full Name</th>
-                      <th className="py-1.5 pr-2 font-semibold text-gray-700">Ardi Number</th>
+                      <th className="py-1.5 pr-2 font-semibold text-gray-700">StuName</th>
+                      <th className="py-1.5 pr-2 font-semibold text-gray-700">Reg_no</th>
                       <th className="py-1.5 font-semibold text-gray-700">Email</th>
                     </tr>
                   </thead>
                   <tbody>
                     {STUDENT_IMPORT_SAMPLE_ROWS.map((row) => (
-                      <tr key={row["Ardi Number"]} className="border-b border-gray-100 last:border-b-0">
+                      <tr key={row.Reg_no} className="border-b border-gray-100 last:border-b-0">
                         <td className="py-1.5 pr-2 text-gray-600">{row.Section}</td>
-                        <td className="py-1.5 pr-2 text-gray-800">{row["Full Name"]}</td>
-                        <td className="py-1.5 pr-2 text-gray-800">{row["Ardi Number"]}</td>
+                        <td className="py-1.5 pr-2 text-gray-800">{row.StuName}</td>
+                        <td className="py-1.5 pr-2 text-gray-800">{row.Reg_no}</td>
                         <td className="py-1.5 text-gray-600">{row.Email}</td>
                       </tr>
                     ))}
@@ -374,17 +423,60 @@ Errors: ${result.errorCount || 0}${errorPreview}`
             <h2 className="mb-4 text-center text-lg font-semibold text-gray-900">
               {editingStudent ? "Edit student" : "Add student"}
             </h2>
-            <input className="mb-3 w-full rounded-lg border px-3 py-2" placeholder="Student name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-            <input className="mb-3 w-full rounded-lg border px-3 py-2" placeholder="ARID / Roll No" value={aridNo} onChange={(e) => setAridNo(e.target.value)} />
-            <input
-              className="mb-4 w-full rounded-lg border px-3 py-2"
-              placeholder="Email optional"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <button type="button" onClick={saveStudent} className="w-full rounded-lg py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
-              {editingStudent ? "Save" : "Add"}
+            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+              Section <span className="text-red-600">*</span>
+              <AppSelect
+                className="mt-1 w-full"
+                value={formSectionId}
+                onChange={(e) => setFormSectionId(e.target.value)}
+              >
+                <option value="">Select section</option>
+                {(sessionSections.length ? sessionSections : section ? [section] : []).map((item) => {
+                  const id = pickPositiveId(item.sectionId, item.SectionId);
+                  return (
+                    <option key={id} value={String(id)}>
+                      {item.sectionName ?? item.SectionName ?? `Section ${id}`}
+                    </option>
+                  );
+                })}
+              </AppSelect>
+            </label>
+            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+              Name <span className="text-red-600">*</span>
+              <input
+                className="mt-1 w-full rounded-lg border px-3 py-2 font-normal text-gray-900"
+                placeholder="e.g. Ali Khan"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </label>
+            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+              ID / Registration <span className="text-red-600">*</span>
+              <input
+                className="mt-1 w-full rounded-lg border px-3 py-2 font-normal text-gray-900"
+                placeholder="e.g. 23-Arid-0000"
+                value={aridNo}
+                onChange={(e) => setAridNo(e.target.value)}
+              />
+            </label>
+            <label className="mb-4 block text-xs font-extrabold text-gray-600">
+              Email
+              <input
+                className="mt-1 w-full rounded-lg border px-3 py-2 font-normal text-gray-900"
+                placeholder="e.g. ali@biit.edu.pk (optional)"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={saveStudent}
+              className="w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              style={{ backgroundColor: theme.colors.primaryDark }}
+            >
+              {saving ? "Saving…" : editingStudent ? "Save" : "Add"}
             </button>
             <button type="button" onClick={() => setFormVisible(false)} className="mt-3 w-full font-bold text-gray-500">
               Cancel

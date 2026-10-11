@@ -2,10 +2,25 @@ import React, { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import theme from "../../styles/theme";
 import { AuthContext } from "../../context/AuthContext.jsx";
-import { createSession, getSessionsByProgram } from "../../api/sessionsApi";
+import {
+  createSession,
+  deleteSession,
+  getSessionsByProgram,
+  updateSession,
+} from "../../api/sessionsApi";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
-import { showAlert } from "../../utils/dialogs";
+import ListRowActions from "../../components/ListRowActions.jsx";
+import { showAlert, showConfirm } from "../../utils/dialogs";
+
+const DEGREE_YEARS = 4;
+
+function academicYearFromTitle(title) {
+  const match = String(title || "").match(/\b((?:19|20)\d{2})\b/);
+  if (!match) return "";
+  const startYear = Number(match[1]);
+  return `${startYear}-${startYear + DEGREE_YEARS}`;
+}
 
 export default function HodSessionsScreen() {
   const { user } = useContext(AuthContext);
@@ -17,13 +32,20 @@ export default function HodSessionsScreen() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [sessionTitle, setSessionTitle] = useState("");
   const [academicYear, setAcademicYear] = useState("");
 
-  const effectiveProgram = program && String(program.programId) === String(programId) ? program : null;
+  const targetProgramId = Number(programId || program?.programId);
+  const effectiveProgram =
+    program && String(program.programId) === String(programId)
+      ? program
+      : targetProgramId
+        ? { programId: targetProgramId, programName: program?.programName }
+        : null;
 
   const loadSessions = async () => {
-    if (!effectiveProgram) return;
+    if (!effectiveProgram?.programId) return;
     try {
       setLoading(true);
       const data = await getSessionsByProgram(effectiveProgram.programId);
@@ -39,22 +61,61 @@ export default function HodSessionsScreen() {
     loadSessions();
   }, [effectiveProgram?.programId]);
 
-  const handleCreateSession = async () => {
+  const openAdd = () => {
+    setEditing(null);
+    setSessionTitle("");
+    setAcademicYear("");
+    setModalVisible(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setSessionTitle(item.sessionTitle || item.SessionTitle || "");
+    setAcademicYear(item.academicYear || item.AcademicYear || "");
+    setModalVisible(true);
+  };
+
+  const handleSaveSession = async () => {
     if (!sessionTitle.trim()) {
       showAlert("Validation Error", "Session title is required.");
       return;
     }
 
     try {
-      await createSession({
+      const payload = {
         programId: effectiveProgram.programId,
         sessionTitle: sessionTitle.trim(),
         academicYear: academicYear.trim() || null,
-      });
-
+      };
+      if (editing) {
+        await updateSession(editing.sessionId ?? editing.SessionId, payload);
+        showAlert("Saved", "Session updated.");
+      } else {
+        await createSession(payload);
+        showAlert("Saved", "Session created.");
+      }
       setModalVisible(false);
+      setEditing(null);
       setSessionTitle("");
       setAcademicYear("");
+      await loadSessions();
+    } catch (error) {
+      showAlert("Error", error.message);
+    }
+  };
+
+  const handleDelete = async (item) => {
+    if (
+      !(await showConfirm(
+        "Delete session",
+        `Delete ${item.sessionTitle || item.SessionTitle}? Sections under it may block this.`
+      ))
+    ) {
+      return;
+    }
+    try {
+      await deleteSession(item.sessionId ?? item.SessionId);
+      showAlert("Deleted", "Session deleted.");
       await loadSessions();
     } catch (error) {
       showAlert("Error", error.message);
@@ -86,7 +147,7 @@ export default function HodSessionsScreen() {
           <h1 className="truncate text-xl font-semibold text-gray-900">Sessions</h1>
           <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "HOD"}</p>
         </div>
-        <AddHeaderButton label="Add Session" onClick={() => setModalVisible(true)} />
+        <AddHeaderButton label="Add Session" onClick={openAdd} />
       </div>
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
@@ -100,23 +161,34 @@ export default function HodSessionsScreen() {
         ) : (
           <div className="space-y-2.5">
             {sessions.map((item) => (
-              <button
-                key={item.sessionId}
-                type="button"
-                onClick={() =>
-                  navigate(`/hod/program/${effectiveProgram.programId}/session/${item.sessionId}`, {
-                    state: { program: effectiveProgram, session: item },
-                  })
-                }
-                className="w-full rounded-2xl border border-gray-100 bg-white shadow-card p-4 text-left shadow-sm transition hover:bg-brand-muted/40"
+              <div
+                key={item.sessionId ?? item.SessionId}
+                className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-card"
               >
-                <p className="text-sm font-semibold text-gray-900">{item.sessionTitle}</p>
-                <p className="mt-0.5 text-xs text-gray-600">{item.academicYear}</p>
-                <p className="mt-0.5 text-xs text-gray-500">{effectiveProgram.programName}</p>
-              </button>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() =>
+                    navigate(
+                      `/hod/program/${effectiveProgram.programId}/session/${item.sessionId ?? item.SessionId}`,
+                      { state: { program: effectiveProgram, session: item } }
+                    )
+                  }
+                >
+                  <p className="text-sm font-semibold text-gray-900">
+                    {item.sessionTitle || item.SessionTitle}
+                  </p>
+                  {(item.academicYear || item.AcademicYear) && (
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {item.academicYear || item.AcademicYear}
+                    </p>
+                  )}
+                </button>
+                <ListRowActions onEdit={() => openEdit(item)} onDelete={() => handleDelete(item)} />
+              </div>
             ))}
             {sessions.length === 0 && (
-              <p className="py-8 text-center text-sm text-gray-500">No sessions added yet.</p>
+              <p className="py-6 text-center text-sm font-medium text-gray-500">No sessions yet.</p>
             )}
           </div>
         )}
@@ -133,33 +205,39 @@ export default function HodSessionsScreen() {
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-3 text-lg font-semibold text-gray-900">Create Session</h2>
-            <label className="text-sm font-extrabold">Session Title</label>
-            <input
-              className="mb-3 mt-1 w-full rounded-lg border px-3 py-2"
-              placeholder="eg. Fall 2026"
-              value={sessionTitle}
-              onChange={(e) => setSessionTitle(e.target.value)}
-            />
-            <label className="text-sm font-extrabold">Academic Year</label>
-            <input
-              className="mb-4 mt-1 w-full rounded-lg border px-3 py-2"
-              placeholder="eg. 2026-2030"
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={handleCreateSession}
-              className="w-full rounded-lg py-3 font-black text-white"
-              style={{ backgroundColor: theme.colors.primaryDark }}
-            >
-              Create Session
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              {editing ? "Edit Session" : "Add Session"}
+            </h2>
+            <label className="mb-3 block text-sm font-semibold text-gray-700">
+              Session title
+              <input
+                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                placeholder="e.g. Spring 2026"
+                value={sessionTitle}
+                onChange={(e) => {
+                  const nextTitle = e.target.value;
+                  setSessionTitle(nextTitle);
+                  const derived = academicYearFromTitle(nextTitle);
+                  if (derived) setAcademicYear(derived);
+                }}
+              />
+            </label>
+            <label className="mb-4 block text-sm font-semibold text-gray-700">
+              Academic year
+              <input
+                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                placeholder="e.g. 2026-2030"
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value)}
+              />
+            </label>
+            <button type="button" onClick={handleSaveSession} className="app-btn-primary w-full py-3">
+              Save
             </button>
             <button
               type="button"
               onClick={() => setModalVisible(false)}
-              className="mt-3 w-full text-center font-bold text-gray-500"
+              className="mt-3 w-full font-bold text-gray-500"
             >
               Cancel
             </button>
