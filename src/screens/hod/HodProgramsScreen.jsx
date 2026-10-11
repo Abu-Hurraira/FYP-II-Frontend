@@ -1,24 +1,23 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
-import { AuthContext } from "../../context/AuthContext.jsx";
 import {
   createProgram,
   deleteProgram,
   getPrograms,
   updateProgram,
 } from "../../api/programsApi";
-import PageBackButton from "../../components/PageBackButton.jsx";
-import AddHeaderButton from "../../components/AddHeaderButton.jsx";
-import ListRowActions from "../../components/ListRowActions.jsx";
+import { getSessions } from "../../api/sessionsApi";
+import HodMintHeader from "../../components/HodMintHeader.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 
 export default function HodProgramsScreen() {
-  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [programs, setPrograms] = useState([]);
+  const [sessionCounts, setSessionCounts] = useState({});
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState(null);
   const [programName, setProgramName] = useState("");
@@ -27,8 +26,18 @@ export default function HodProgramsScreen() {
   const loadPrograms = async () => {
     try {
       setLoading(true);
-      const data = await getPrograms();
+      const [data, sessions] = await Promise.all([
+        getPrograms(),
+        getSessions().catch(() => []),
+      ]);
       setPrograms(data || []);
+      const counts = {};
+      for (const session of sessions || []) {
+        const id = session.programId ?? session.ProgramId;
+        if (id == null) continue;
+        counts[id] = (counts[id] || 0) + 1;
+      }
+      setSessionCounts(counts);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -100,18 +109,59 @@ export default function HodProgramsScreen() {
     }
   };
 
+  const visiblePrograms = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = programs.filter((item) => {
+      if (!q) return true;
+      const name = String(item.programName || item.ProgramName || "").toLowerCase();
+      const code = String(item.programCode || item.ProgramCode || "").toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+    list.sort((a, b) => {
+      const an = String(a.programName || a.ProgramName || "");
+      const bn = String(b.programName || b.ProgramName || "");
+      return an.localeCompare(bn);
+    });
+    return list;
+  }, [programs, search]);
+
+  const openProgram = (item) => {
+    navigate(`/hod/program/${item.programId ?? item.ProgramId}/menu`, {
+      state: { program: item },
+    });
+  };
+
   return (
     <div className="min-h-full bg-page">
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <PageBackButton className="mt-0.5" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold text-gray-900">Programs</h1>
-          <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "HOD"}</p>
-        </div>
-        <AddHeaderButton label="Add Program" onClick={openAdd} />
-      </div>
+      <HodMintHeader
+        title="Programs"
+        subtitle="Manage academic programs and their sessions."
+        action={
+          <button
+            type="button"
+            onClick={openAdd}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+          >
+            <span className="text-lg leading-none">+</span>
+            Add Programs
+          </button>
+        }
+      />
+      <div className="w-full space-y-4 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
 
-      <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
+        <div className="relative">
+            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search programs..."
+              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-600/15"
+            />
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-16">
             <div
@@ -119,37 +169,88 @@ export default function HodProgramsScreen() {
               style={{ borderTopColor: theme.colors.primary }}
             />
           </div>
+        ) : visiblePrograms.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center text-sm text-gray-500">
+            {search ? "No programs match your search." : "No programs yet."}
+          </p>
         ) : (
-          <div className="space-y-2.5 pt-2">
-            {programs.map((item) => (
-              <div
-                key={item.programId ?? item.ProgramId}
-                className="flex w-full items-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-card"
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(`/hod/program/${item.programId ?? item.ProgramId}/menu`, {
-                      state: { program: item },
-                    })
-                  }
-                  className="min-w-0 flex-1 text-left transition hover:opacity-80"
+          <div className="space-y-3">
+            {visiblePrograms.map((item) => {
+              const id = item.programId ?? item.ProgramId;
+              const name = item.programName || item.ProgramName;
+              const code = item.programCode || item.ProgramCode || "";
+              const sessions = sessionCounts[id] || 0;
+              return (
+                <article
+                  key={id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openProgram(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openProgram(item);
+                    }
+                  }}
+                  className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-emerald-200"
                 >
-                  <p className="text-sm font-semibold text-gray-900">
-                    {item.programName || item.ProgramName}
-                  </p>
-                  {(item.programCode || item.ProgramCode) && (
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      {item.programCode || item.ProgramCode}
-                    </p>
-                  )}
-                </button>
-                <ListRowActions onEdit={() => openEdit(item)} onDelete={() => handleDelete(item)} />
-              </div>
-            ))}
-            {programs.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-500">No programs yet.</p>
-            )}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white">
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422A12.083 12.083 0 0112 20.5a12.083 12.083 0 01-6.16-1.922L12 14z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-lg font-bold text-gray-900">{name}</h2>
+                          {code ? (
+                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              {code}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500">
+                          {code ? `Program Code: ${code}` : "Program"}
+                          <span className="mx-2 text-gray-300">·</span>
+                          Sessions: {sessions}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEdit(item);
+                        }}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        aria-label="Edit program"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDelete(item);
+                        }}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 text-red-500 hover:bg-red-50"
+                        aria-label="Delete program"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <span className="pl-1 text-xl text-gray-300">›</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

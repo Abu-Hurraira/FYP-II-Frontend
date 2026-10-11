@@ -8,6 +8,7 @@ import LoginScreen from "./screens/auth/LoginScreen.jsx";
 import TeacherLayout from "./layouts/TeacherLayout.jsx";
 import AdminLayout from "./layouts/AdminLayout.jsx";
 import HodLayout from "./layouts/HodLayout.jsx";
+import GraderLayout from "./layouts/GraderLayout.jsx";
 
 /* Lazy: screens load only when the route is visited */
 const TeacherHomeScreen = lazy(() => import("./screens/teacher/TeacherHomeScreen.jsx"));
@@ -28,8 +29,8 @@ const TeacherSynchronizationScreen = lazy(() => import("./screens/teacher/Teache
 const TeacherProfileScreen = lazy(() => import("./screens/teacher/TeacherProfileScreen.jsx"));
 const TeacherNotificationsScreen = lazy(() => import("./screens/teacher/TeacherNotificationsScreen.jsx"));
 const TeacherAttendanceScreen = lazy(() => import("./screens/teacher/TeacherAttendanceScreen.jsx"));
+const TeacherGraderTasksScreen = lazy(() => import("./screens/teacher/TeacherGraderTasksScreen.jsx"));
 const TeacherFcarReportScreen = lazy(() => import("./screens/teacher/TeacherFcarReportScreen.jsx"));
-const TeacherStudentPloResultsScreen = lazy(() => import("./screens/teacher/TeacherStudentPloResultsScreen.jsx"));
 const TeacherMappingsScreen = lazy(() => import("./screens/teacher/TeacherMappingsScreen.jsx"));
 const RedirectToCourseMappings = lazy(() => import("./screens/teacher/RedirectToCourseMappings.jsx"));
 
@@ -66,9 +67,11 @@ const HodSubmittedFoldersScreen = lazy(() => import("./screens/hod/HodSubmittedF
 const HodCloApprovalsScreen = lazy(() => import("./screens/hod/HodCloApprovalsScreen.jsx"));
 const HodNotificationsScreen = lazy(() => import("./screens/hod/HodNotificationsScreen.jsx"));
 const HodAllocationScreen = lazy(() => import("./screens/hod/HodAllocationScreen.jsx"));
+const HodPloResultsScreen = lazy(() => import("./screens/hod/HodPloResultsScreen.jsx"));
 const HodSubmittedFolderDetailScreen = lazy(() => import("./screens/hod/HodSubmittedFolderDetailScreen.jsx"));
 const HodSubmittedFolderFilesScreen = lazy(() => import("./screens/hod/HodSubmittedFolderFilesScreen.jsx"));
 const GraderHomeScreen = lazy(() => import("./screens/grader/GraderHomeScreen.jsx"));
+const GraderCourseMenuScreen = lazy(() => import("./screens/grader/GraderCourseMenuScreen.jsx"));
 
 export const normalizeRole = (user) => {
   const rawRoleId =
@@ -161,6 +164,7 @@ const App = () => {
         <Route path="notifications" element={<LazyPage><TeacherNotificationsScreen /></LazyPage>} />
         <Route path="submit-folders" element={<LazyPage><TeacherSubmitFoldersScreen /></LazyPage>} />
         <Route path="attendance" element={<LazyPage><TeacherAttendanceScreen /></LazyPage>} />
+        <Route path="graders" element={<LazyPage><TeacherGraderTasksScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/menu" element={<LazyPage><TeacherCourseMenuScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/weekly-content" element={<LazyPage><WeeklyContentScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/clos" element={<LazyPage><TeacherClosScreen /></LazyPage>} />
@@ -178,7 +182,6 @@ const App = () => {
         <Route path="course/:offeredCourseId/component-marks" element={<LazyPage><TeacherComponentMarksScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/clo-plo" element={<LazyPage><RedirectToCourseMappings section="clo-plo" /></LazyPage>} />
         <Route path="course/:offeredCourseId/fcar-report" element={<LazyPage><TeacherFcarReportScreen /></LazyPage>} />
-        <Route path="course/:offeredCourseId/plo-results" element={<LazyPage><TeacherStudentPloResultsScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/folder" element={<LazyPage><TeacherCourseFolderScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/sync" element={<LazyPage><TeacherSynchronizationScreen /></LazyPage>} />
         <Route path="folder-upload" element={<LazyPage><TeacherFolderUploadScreen /></LazyPage>} />
@@ -236,6 +239,7 @@ const App = () => {
         <Route path="program/:programId/mapping/plo-course" element={<LazyPage><HodPloCourseMappingScreen /></LazyPage>} />
         <Route path="graders" element={<LazyPage><HodGradersScreen /></LazyPage>} />
         <Route path="allocation" element={<LazyPage><HodAllocationScreen /></LazyPage>} />
+        <Route path="plo-results" element={<LazyPage><HodPloResultsScreen /></LazyPage>} />
         <Route path="submitted-folders" element={<LazyPage><HodSubmittedFoldersScreen /></LazyPage>} />
         <Route path="clo-approvals" element={<LazyPage><HodCloApprovalsScreen /></LazyPage>} />
         <Route path="notifications" element={<LazyPage><HodNotificationsScreen /></LazyPage>} />
@@ -248,18 +252,19 @@ const App = () => {
         path="/grader"
         element={
           <RequireAuth roles={["grader"]}>
-            <LazyPage><GraderHomeScreen /></LazyPage>
+            <GraderLayout />
           </RequireAuth>
         }
-      />
-      <Route
-        path="/grader/profile"
-        element={
-          <RequireAuth roles={["grader"]}>
-            <LazyPage><ProfileScreen /></LazyPage>
-          </RequireAuth>
-        }
-      />
+      >
+        <Route index element={<LazyPage><GraderHomeScreen /></LazyPage>} />
+        <Route path="profile" element={<LazyPage><ProfileScreen /></LazyPage>} />
+        <Route path="attendance" element={<LazyPage><TeacherAttendanceScreen /></LazyPage>} />
+        <Route path="course/:offeredCourseId/menu" element={<LazyPage><GraderCourseMenuScreen /></LazyPage>} />
+        <Route path="course/:offeredCourseId/assignments" element={<LazyPage><TeacherAssignmentsScreen key="grader-assignments" /></LazyPage>} />
+        <Route path="course/:offeredCourseId/quizzes" element={<LazyPage><TeacherAssignmentsScreen key="grader-quizzes" variant="Quiz" /></LazyPage>} />
+        <Route path="course/:offeredCourseId/component-marks" element={<LazyPage><TeacherComponentMarksScreen /></LazyPage>} />
+        <Route path="course/:offeredCourseId/assessments/:assessmentId/marks" element={<LazyPage><TeacherAssessmentMarksScreen /></LazyPage>} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -54,6 +54,10 @@ export default function TeacherLayout() {
             <SidebarIconAttendance />
             Attendance
           </NavLink>
+          <NavLink to="/teacher/graders" className={sidebarNavClass}>
+            <span className="text-lg leading-none">✓</span>
+            My Graders
+          </NavLink>
 
           <div className="my-3 border-t border-white/10" />
 

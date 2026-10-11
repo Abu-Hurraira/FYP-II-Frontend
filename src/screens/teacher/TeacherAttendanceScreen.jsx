@@ -1,7 +1,9 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import { getAttendanceSheet, importAttendanceSheet, updateAttendanceSheet } from "../../api/attendanceApi";
 import { getTeacherCoursesPage } from "../../api/teacherApi";
+import { getGraderTasksMine } from "../../api/graderTasksApi";
 import AppSelect from "../../components/AppSelect.jsx";
 import { showAlert } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
@@ -41,10 +43,18 @@ function formatDateLabel(value) {
 
 export default function TeacherAttendanceScreen() {
   const { user } = useContext(AuthContext);
-  const teacherUserId = getAuthUserId(user);
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const isGraderWorkspace = location.pathname.startsWith("/grader");
+  const routeTeacher = searchParams.get("teacherUserId");
+  const teacherUserId =
+    routeTeacher != null && routeTeacher !== ""
+      ? Number(routeTeacher) || getAuthUserId(user)
+      : getAuthUserId(user);
+  const routeCourse = searchParams.get("offeredCourseId");
 
   const [courses, setCourses] = useState([]);
-  const [offeredCourseId, setOfferedCourseId] = useState("");
+  const [offeredCourseId, setOfferedCourseId] = useState(routeCourse || "");
   const [sheet, setSheet] = useState(null);
   const [draft, setDraft] = useState({});
   const [loading, setLoading] = useState(true);
@@ -54,19 +64,32 @@ export default function TeacherAttendanceScreen() {
   const [newDate, setNewDate] = useState("");
 
   const loadCourses = useCallback(async () => {
-    if (!teacherUserId) {
+    if (!teacherUserId && !isGraderWorkspace) {
       setLoading(false);
       return;
     }
     try {
-      const data = await getTeacherCoursesPage({ teacherUserId, page: 1, pageSize: 48 });
-      setCourses(data?.items || []);
+      if (isGraderWorkspace) {
+        const mine = await getGraderTasksMine();
+        setCourses(
+          mine
+            .filter((row) => (row.tasks || []).some((t) => t.assigned && t.taskCode === "Attendance"))
+            .map((row) => ({
+              offeredCourseId: row.offeredCourseId,
+              courseTitle: row.courseTitle,
+              sectionName: row.sectionName,
+            }))
+        );
+      } else {
+        const data = await getTeacherCoursesPage({ teacherUserId, page: 1, pageSize: 48 });
+        setCourses(data?.items || []);
+      }
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
     }
-  }, [teacherUserId]);
+  }, [teacherUserId, isGraderWorkspace]);
 
   useEffect(() => {
     loadCourses();

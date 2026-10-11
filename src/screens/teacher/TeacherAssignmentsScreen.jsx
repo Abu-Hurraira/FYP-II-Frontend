@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   getAssessmentsList,
   createAssessment,
@@ -8,6 +8,7 @@ import {
   addAssessmentQuestion,
   updateAssessmentQuestion,
   uploadAssessmentFile,
+  parseQuestionPaper,
   getAvailableClos,
   getCourseMenu,
   completeAssessmentSetup,
@@ -226,6 +227,9 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
       : user?.userId;
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const isGraderWorkspace = location.pathname.startsWith("/grader");
+  const marksBase = isGraderWorkspace ? "/grader" : "/teacher";
   const isExamHodFlow = variant === "Mid" || variant === "Final";
   const examTypeCode = examContentTypeCode(variant);
 
@@ -344,6 +348,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
   const [uploadPurpose, setUploadPurpose] = useState("Solution");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isParsingPaper, setIsParsingPaper] = useState(false);
   const [isTogglingSetup, setIsTogglingSetup] = useState(false);
 
   const [loadSchemeModal, setLoadSchemeModal] = useState(false);
@@ -1006,6 +1011,23 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
     setUploadModalOpen(true);
   };
 
+  const applyParsedPaper = async (assessmentId) => {
+    try {
+      setIsParsingPaper(true);
+      const parsed = await parseQuestionPaper(assessmentId, teacherUserId);
+      const incoming = (parsed.questions ?? parsed.Questions ?? []).map(mapQuestionDraft);
+      if (incoming.length > 0) {
+        setQuestionsDraft(incoming);
+        setExpandedQuestions(Object.fromEntries(incoming.map((_, i) => [i, true])));
+      }
+      showAlert("Paper read", parsed.message ?? parsed.Message ?? "Review the questions and CLO mapping, then save.");
+    } catch (err) {
+      showAlert("Could not read paper", err.message || "Add questions below.");
+    } finally {
+      setIsParsingPaper(false);
+    }
+  };
+
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedAssessmentId) {
       showAlert("Validation Error", "Please select a file first.");
@@ -1025,6 +1047,9 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
       setUploadModalOpen(false);
       setSelectedFile(null);
       await loadDetail(selectedAssessmentId);
+      if (String(uploadPurpose).toLowerCase().includes("question")) {
+        await applyParsedPaper(selectedAssessmentId);
+      }
     } catch (err) {
       showAlert("Upload Error", err.message || "Failed to upload file.");
     } finally {
@@ -1043,7 +1068,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
       return;
     }
     navigate(
-      `/teacher/course/${offeredCourseId}/assessments/${selectedAssessmentId}/marks?teacherUserId=${teacherUserId ?? ""}`
+      `${marksBase}/course/${offeredCourseId}/assessments/${selectedAssessmentId}/marks?teacherUserId=${teacherUserId ?? ""}`
     );
   };
 
@@ -1223,7 +1248,14 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
   const renderUploadCard = (title, purpose, file) => (
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a] flex items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <h3 className="text-base font-extrabold text-gray-900 dark:text-white">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-base font-extrabold text-gray-900 dark:text-white">{title}</h3>
+          {file ? (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+              Uploaded
+            </span>
+          ) : null}
+        </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5 truncate">
           {file ? file.fileName ?? file.FileName : "No file uploaded yet"}
         </p>
@@ -1393,7 +1425,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
             </div>
             ) : null}
 
-            {(!cfg.hideAddTemplate || (isExamHodFlow && canManageExam)) && (
+            {!isGraderWorkspace && (!cfg.hideAddTemplate || (isExamHodFlow && canManageExam)) && (
             <div className="flex flex-wrap items-center pt-4 gap-3">
               {!cfg.hideAddTemplate && (
               <button
@@ -1443,11 +1475,15 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               </div>
             ) : (
               <>
-                {renderUploadCard("Question Paper", "Question Paper", questionPaperFile)}
-                {renderUploadCard(cfg.solutionLabel || "Solution", "Solution", solutionFile)}
-                {renderUploadCard("Best Sample", "Best Sample", bestSampleFile)}
-                {renderUploadCard("Average Sample", "Average Sample", averageSampleFile)}
-                {renderUploadCard("Worst Sample", "Worst Sample", worstSampleFile)}
+                {!isGraderWorkspace && (
+                  <>
+                    {renderUploadCard("Question Paper", "Question Paper", questionPaperFile)}
+                    {renderUploadCard(cfg.solutionLabel || "Solution", "Solution", solutionFile)}
+                    {renderUploadCard("Best Sample", "Best Sample", bestSampleFile)}
+                    {renderUploadCard("Average Sample", "Average Sample", averageSampleFile)}
+                    {renderUploadCard("Worst Sample", "Worst Sample", worstSampleFile)}
+                  </>
+                )}
 
                 {/* Card 3: Enter Marks */}
                 <div
@@ -1466,7 +1502,18 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                 </div>
 
                 {/* Card 4: Questions & CLO Mapping */}
+                {!isGraderWorkspace && (
                 <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a] space-y-4">
+                  {canEditPaper ? (
+                    <button
+                      type="button"
+                      disabled={isParsingPaper}
+                      onClick={() => applyParsedPaper(selectedAssessmentId)}
+                      className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 disabled:opacity-50"
+                    >
+                      {isParsingPaper ? "Reading paper…" : "Read questions from uploaded paper"}
+                    </button>
+                  ) : null}
                   <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1b2c2e] pb-3">
                     <div>
                       <h3 className="text-lg font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1912,6 +1959,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                     )}
                   </div>
                 </div>
+                )}
 
               </>
             )}

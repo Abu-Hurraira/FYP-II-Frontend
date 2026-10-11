@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { getStudentPloResults } from "../../api/cloAttainmentApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
@@ -60,16 +60,22 @@ function HoverCard({ tip }) {
   );
 }
 
-export default function TeacherStudentPloResultsScreen() {
+export default function TeacherStudentPloResultsScreen({
+  offeredCourseId: offeredCourseIdProp,
+  teacherUserId: teacherUserIdProp,
+  embedded = false,
+}) {
   const { user } = useContext(AuthContext);
   const { offeredCourseId: ocParam } = useParams();
-  const offeredCourseId = Number(ocParam);
+  const offeredCourseId = Number(offeredCourseIdProp ?? ocParam);
   const [searchParams] = useSearchParams();
   const routeTeacher = searchParams.get("teacherUserId");
   const teacherUserId =
-    routeTeacher != null && routeTeacher !== ""
-      ? Number(routeTeacher) || user?.userId
-      : user?.userId;
+    teacherUserIdProp != null && teacherUserIdProp !== ""
+      ? Number(teacherUserIdProp) || user?.userId
+      : routeTeacher != null && routeTeacher !== ""
+        ? Number(routeTeacher) || user?.userId
+        : user?.userId;
   const courseTitle = searchParams.get("courseTitle") || "";
 
   const [data, setData] = useState(null);
@@ -110,23 +116,48 @@ export default function TeacherStudentPloResultsScreen() {
     () => students.find((s) => Number(pick(s, "studentId", "StudentId")) === Number(selectedId)) ?? null,
     [students, selectedId]
   );
+  const tableWrapRef = useRef(null);
+  const [panelTop, setPanelTop] = useState(0);
+
+  const placePanel = useCallback(() => {
+    const wrap = tableWrapRef.current;
+    if (!wrap || selectedId == null) {
+      setPanelTop(0);
+      return;
+    }
+    const row = wrap.querySelector(`[data-student-id="${selectedId}"]`);
+    if (!row) return;
+    const top = row.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
+    setPanelTop(Math.max(0, top));
+  }, [selectedId]);
+
+  useLayoutEffect(() => {
+    placePanel();
+  }, [placePanel, students, loading, ploColumns.length]);
+
+  useEffect(() => {
+    window.addEventListener("resize", placePanel);
+    return () => window.removeEventListener("resize", placePanel);
+  }, [placePanel]);
 
   return (
-    <div className="relative min-h-full bg-page pb-12">
-      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8 dark:border-[#1b2c2e] dark:bg-[#071113]">
-        <div className="flex min-w-0 items-center gap-3">
-          <PageBackButton className="mt-0.5 shrink-0" />
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">PLO Results</h1>
-            <p className="mt-0.5 text-xs text-gray-500">
-              {courseTitle || pick(data, "courseTitle", "CourseTitle") || "Student PLO attainment"}
-              {" · "}Fail below {threshold}%
-            </p>
+    <div className={embedded ? "relative" : "relative min-h-full bg-page pb-12"}>
+      {embedded ? null : (
+        <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8 dark:border-[#1b2c2e] dark:bg-[#071113]">
+          <div className="flex min-w-0 items-center gap-3">
+            <PageBackButton className="mt-0.5 shrink-0" />
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">PLO Results</h1>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {courseTitle || pick(data, "courseTitle", "CourseTitle") || "Student PLO attainment"}
+                {" · "}Fail below {threshold}%
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="mx-auto max-w-6xl space-y-4 px-4 pt-4">
+      <div className={embedded ? "space-y-4" : "space-y-4 px-4 pt-4 sm:px-6 lg:px-8"}>
         {loading ? (
           <div className="flex min-h-[40vh] items-center justify-center">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
@@ -141,7 +172,8 @@ export default function TeacherStudentPloResultsScreen() {
               </div>
             ) : null}
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+            <div className="flex items-start gap-4">
+            <div ref={tableWrapRef} className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:bg-[#102023] dark:text-gray-400">
                   <tr>
@@ -189,6 +221,7 @@ export default function TeacherStudentPloResultsScreen() {
                       return (
                         <tr
                           key={id}
+                          data-student-id={id}
                           className={`cursor-pointer ${rowTone}`}
                           onClick={() => setSelectedId(id)}
                         >
@@ -240,102 +273,95 @@ export default function TeacherStudentPloResultsScreen() {
               </table>
             </div>
 
-            <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
-              <h2 className="text-lg font-black text-gray-900 dark:text-white">Detail view</h2>
-              {!selected ? (
-                <p className="mt-2 text-sm text-gray-500">Select a student to see PLO marks used (obtained / max).</p>
-              ) : (
-                <div className="mt-3 space-y-4">
-                  <div
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-                      pick(selected, "failedByPlo", "FailedByPlo")
-                        ? "bg-red-100 text-red-900"
-                        : "text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    <p>
-                      {pick(selected, "fullName", "FullName")}
+            <aside className="relative hidden w-96 shrink-0 self-stretch lg:block">
+              {selected ? (
+                <section
+                  className="absolute left-0 right-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-[#1b2c2e] dark:bg-[#0c181a]"
+                  style={{ top: panelTop }}
+                >
+                  <header className="border-b border-gray-100 bg-gray-50 px-4 py-3 dark:border-[#1b2c2e] dark:bg-[#102023]">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Detail view</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                        {pick(selected, "fullName", "FullName")}
+                      </h2>
                       {pick(selected, "failedByPlo", "FailedByPlo") ? (
-                        <span className="ml-2 rounded-full bg-red-200 px-2 py-0.5 text-xs font-bold text-red-800">
+                        <span className="rounded-full bg-red-200 px-2 py-0.5 text-[11px] font-bold text-red-800">
                           Failed by PLO
                         </span>
                       ) : (
-                        <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                          All mapped PLOs passed
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                          Passed
                         </span>
                       )}
-                    </p>
+                    </div>
+                    <p className="mt-0.5 text-xs font-medium text-gray-500">{pick(selected, "aridNo", "AridNo")}</p>
+                  </header>
+                  <div className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
                     {pick(selected, "passAdvice", "PassAdvice") ? (
-                      <p className="mt-1 text-sm font-bold leading-snug">
+                      <p className="text-sm font-semibold leading-snug text-gray-700 dark:text-gray-300">
                         {pick(selected, "passAdvice", "PassAdvice")}
                       </p>
                     ) : null}
-                  </div>
-                  {(selected.plos ?? selected.Plos ?? []).map((plo) => {
-                    const detail = plo.detail ?? plo.Detail ?? [];
-                    const failedPlo = Boolean(pick(plo, "failed", "Failed"));
-                    return (
-                      <div
-                        key={pick(plo, "ploId", "PloId")}
-                        className={`rounded-xl border px-4 py-3 ${
-                          failedPlo
-                            ? "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20"
-                            : "border-gray-100 bg-gray-50 dark:border-[#1b2c2e] dark:bg-[#102023]"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <h3
-                            className="cursor-help text-sm font-black text-gray-900 dark:text-white"
-                            onMouseEnter={(e) =>
-                              showTip(e, pick(plo, "ploCode", "PloCode"), [
-                                pick(plo, "ploDescription", "PloDescription"),
-                              ])
-                            }
-                            onMouseMove={moveTip}
-                            onMouseLeave={hideTip}
-                          >
-                            {pick(plo, "ploCode", "PloCode")}
-                          </h3>
-                          <p className={`text-sm font-bold ${failedPlo ? "text-red-600" : "text-emerald-700"}`}>
-                            {formatPct(pick(plo, "percent", "Percent"))}
-                            {failedPlo ? " · Fail" : pick(plo, "percent", "Percent") != null ? " · Pass" : ""}
-                          </p>
+                    {(selected.plos ?? selected.Plos ?? []).map((plo) => {
+                      const detail = plo.detail ?? plo.Detail ?? [];
+                      const failedPlo = Boolean(pick(plo, "failed", "Failed"));
+                      return (
+                        <div
+                          key={pick(plo, "ploId", "PloId")}
+                          className={`rounded-xl border px-3 py-2.5 ${
+                            failedPlo
+                              ? "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20"
+                              : "border-gray-100 bg-gray-50 dark:border-[#1b2c2e] dark:bg-[#102023]"
+                          }`}
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <h3 className="text-sm font-black text-gray-900 dark:text-white">
+                              {pick(plo, "ploCode", "PloCode")}
+                            </h3>
+                            <p className={`text-sm font-bold ${failedPlo ? "text-red-600" : "text-emerald-700"}`}>
+                              {formatPct(pick(plo, "percent", "Percent"))}
+                              {failedPlo ? " · Fail" : pick(plo, "percent", "Percent") != null ? " · Pass" : ""}
+                            </p>
+                          </div>
+                          <ul className="mt-2 space-y-1">
+                            {detail.length === 0 ? (
+                              <li className="text-xs text-gray-500">No CLO marks mapped to this PLO.</li>
+                            ) : (
+                              detail.map((item) => (
+                                <li
+                                  key={`${pick(item, "cloId", "CloId")}-${pick(item, "label", "Label")}`}
+                                  className="flex items-center justify-between text-sm font-semibold text-gray-800 dark:text-gray-200"
+                                >
+                                  <span>{pick(item, "label", "Label") || pick(item, "cloCode", "CloCode")}</span>
+                                  <span>
+                                    {formatMarks(pick(item, "obtained", "Obtained"), pick(item, "maximum", "Maximum"))}
+                                  </span>
+                                </li>
+                              ))
+                            )}
+                          </ul>
                         </div>
-                        <ul className="mt-2 space-y-1">
-                          {detail.length === 0 ? (
-                            <li className="text-xs text-gray-500">No CLO marks mapped to this PLO.</li>
-                          ) : (
-                            detail.map((item) => (
-                              <li
-                                key={`${pick(item, "cloId", "CloId")}-${pick(item, "label", "Label")}`}
-                                className="flex cursor-help items-center justify-between text-sm font-semibold text-gray-800 dark:text-gray-200"
-                                onMouseEnter={(e) =>
-                                  showTip(
-                                    e,
-                                    pick(item, "cloCode", "CloCode") || pick(item, "label", "Label"),
-                                    cloLines([item])
-                                  )
-                                }
-                                onMouseMove={moveTip}
-                                onMouseLeave={hideTip}
-                              >
-                                <span>{pick(item, "label", "Label") || pick(item, "cloCode", "CloCode")}</span>
-                                <span>
-                                  {formatMarks(
-                                    pick(item, "obtained", "Obtained"),
-                                    pick(item, "maximum", "Maximum")
-                                  )}
-                                </span>
-                              </li>
-                            ))
-                          )}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : (
+                <section className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-6 text-sm text-gray-500 dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+                  Select a student to open the detail view.
+                </section>
               )}
-            </section>
+            </aside>
+            </div>
+
+            {selected ? (
+              <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:hidden dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  {pick(selected, "fullName", "FullName")}
+                </h2>
+                <p className="text-xs text-gray-500">{pick(selected, "aridNo", "AridNo")}</p>
+              </section>
+            ) : null}
             <HoverCard tip={hoverTip} />
           </>
         )}

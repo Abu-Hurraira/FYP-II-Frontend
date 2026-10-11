@@ -1,6 +1,5 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { AuthContext } from "../../context/AuthContext.jsx";
 import { createCourse, getCourses, importCoursesFromExcel, updateCourse } from "../../api/coursesApi";
 import { applyCourseCatalog, listCourseCatalogVersions } from "../../api/courseCatalogApi";
 import {
@@ -10,6 +9,7 @@ import {
 } from "../../api/ploCourseMappingApi";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
+import HodMintHeader from "../../components/HodMintHeader.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import theme from "../../styles/theme";
@@ -19,7 +19,6 @@ function courseIdOf(row) {
 }
 
 export default function HodProgramCoursesScreen() {
-  const { user } = useContext(AuthContext);
   const { programId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -335,16 +334,12 @@ Skipped: ${result.skippedCount ?? 0}`
 
   return (
     <div className="relative min-h-full bg-page">
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <PageBackButton />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold text-gray-900">Course catalog</h1>
-          <p className="mt-0.5 truncate text-xs text-gray-500">
-            {program.programName} · {user?.roleName || "HOD"}
-          </p>
-        </div>
-        <AddHeaderButton label="Add to program" onClick={() => setActionVisible(true)} />
-      </div>
+      <HodMintHeader
+        title="Course Catalog"
+        subtitle="View and manage all courses for this program."
+        action={<AddHeaderButton label="Add to program" onClick={() => setActionVisible(true)} />}
+        back
+      />
 
       <div className="w-full px-4 pb-8 pt-4 sm:px-6 lg:px-8">
         <p className="mb-4 text-sm font-semibold text-gray-500">

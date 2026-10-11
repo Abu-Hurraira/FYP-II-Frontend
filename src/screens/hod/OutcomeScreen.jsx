@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import theme from "../../styles/theme";
-import { AuthContext } from "../../context/AuthContext.jsx";
 import PageBackButton from "../../components/PageBackButton.jsx";
+import HodMintHeader from "../../components/HodMintHeader.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
@@ -47,7 +47,6 @@ const OutcomeScreen = ({
   restoreAllByProgram,
   programsPath = "/hod/programs",
 }) => {
-  const { user } = useContext(AuthContext);
   const { programId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -325,14 +324,16 @@ const OutcomeScreen = ({
 
   return (
     <div className="relative min-h-full bg-page">
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <PageBackButton />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold text-gray-900">{type}s</h1>
-          <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "HOD"}</p>
-        </div>
-        <AddHeaderButton label={`Add ${type}`} onClick={() => setActionModalVisible(true)} />
-      </div>
+      <HodMintHeader
+        title={`${type}s`}
+        subtitle={
+          type === "PLO"
+            ? "View and manage program learning outcomes."
+            : "View and manage program educational objectives."
+        }
+        action={<AddHeaderButton label={`Add ${type}`} onClick={() => setActionModalVisible(true)} />}
+        back
+      />
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
         {loading ? (

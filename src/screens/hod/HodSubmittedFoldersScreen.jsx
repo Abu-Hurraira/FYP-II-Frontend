@@ -6,6 +6,7 @@ import { AuthContext } from "../../context/AuthContext.jsx";
 import theme from "../../styles/theme";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
+import HodMintHeader from "../../components/HodMintHeader.jsx";
 
 function isApprovedFolder(item) {
   return String(item.reviewStatus ?? "").toLowerCase() === "approved";
@@ -106,15 +107,10 @@ export default function HodSubmittedFoldersScreen() {
 
   return (
     <div className="min-h-full bg-page">
-      <div className="border-b border-gray-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <h1 className="text-xl font-semibold text-gray-900">Submitted Folders</h1>
-        <p className="mt-0.5 text-sm text-gray-500">
-          {user?.fullName || user?.name || "HOD"} · Review and view submitted folders
-        </p>
-        {loading ? (
-          <p className="mt-1 text-xs text-gray-400">Checking folder submission status…</p>
-        ) : null}
-      </div>
+      <HodMintHeader
+        title="Submitted Folders"
+        subtitle="Review and view submitted folders."
+      />
 
       <div className="w-full px-4 pb-10 pt-4 sm:px-6 lg:px-8">
         {loading ? (

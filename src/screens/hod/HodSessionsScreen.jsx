@@ -1,7 +1,6 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import theme from "../../styles/theme";
-import { AuthContext } from "../../context/AuthContext.jsx";
 import {
   createSession,
   deleteSession,
@@ -9,6 +8,7 @@ import {
   updateSession,
 } from "../../api/sessionsApi";
 import PageBackButton from "../../components/PageBackButton.jsx";
+import HodMintHeader from "../../components/HodMintHeader.jsx";
 import AddHeaderButton from "../../components/AddHeaderButton.jsx";
 import ListRowActions from "../../components/ListRowActions.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
@@ -23,7 +23,6 @@ function academicYearFromTitle(title) {
 }
 
 export default function HodSessionsScreen() {
-  const { user } = useContext(AuthContext);
   const { programId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -141,14 +140,12 @@ export default function HodSessionsScreen() {
 
   return (
     <div className="min-h-full bg-page">
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <PageBackButton />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold text-gray-900">Sessions</h1>
-          <p className="mt-0.5 text-xs text-gray-500">{user?.roleName || "HOD"}</p>
-        </div>
-        <AddHeaderButton label="Add Session" onClick={openAdd} />
-      </div>
+      <HodMintHeader
+        title="Sessions"
+        subtitle="Manage academic sessions and their details."
+        action={<AddHeaderButton label="Add Session" onClick={openAdd} />}
+        back
+      />
 
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8">
         {loading ? (

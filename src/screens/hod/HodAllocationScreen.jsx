@@ -4,6 +4,7 @@ import { getOfferedCourses } from "../../api/offeredCoursesApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import { UPLOAD_ALLOCATION_TYPES, EMPTY_UPLOAD_ALLOCATION_ROW } from "../../constants/uploadAllocationTypes";
 import theme from "../../styles/theme";
+import HodMintHeader from "../../components/HodMintHeader.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import {
   buildSectionAAllocations,
@@ -186,19 +187,10 @@ export default function HodAllocationScreen() {
 
   return (
     <div className="min-h-full bg-page">
-      <div className="border-b border-gray-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Allocation</h1>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {user?.fullName || user?.name || "HOD"} · Assign upload responsibilities
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Click Save with no ticks to auto-allocate the <strong>first A section</strong> of each
-              course (e.g. Adv Database → BSAI-6A only). Tick rows yourself to allocate other sections.
-              After an allocated teacher saves, other sections of the same course can view the files.
-            </p>
-          </div>
+      <HodMintHeader
+        title="Allocation"
+        subtitle="Assign upload responsibilities."
+        action={
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -217,17 +209,17 @@ export default function HodAllocationScreen() {
               {saving ? "Saving…" : "Save Allocation"}
             </button>
           </div>
-        </div>
-        {configured ? (
-          <p className="mt-2 text-xs font-semibold text-blue-700">
-            Saved allocations show blue ticks. Allocation is active for teachers.
-          </p>
-        ) : (
-          <p className="mt-2 text-xs text-amber-700">
-            Nothing allocated yet. Click Save to auto-assign the first A section of each course, or tick rows yourself.
-          </p>
-        )}
-      </div>
+        }
+      />
+      {configured ? (
+        <p className="bg-white px-4 pb-3 text-xs font-semibold text-blue-700 sm:px-6 lg:px-8">
+          Saved allocations show blue ticks. Allocation is active for teachers.
+        </p>
+      ) : (
+        <p className="bg-white px-4 pb-3 text-xs text-amber-700 sm:px-6 lg:px-8">
+          Nothing allocated yet. Click Save to auto-assign the first A section of each course, or tick rows yourself.
+        </p>
+      )}
 
       <div className="w-full px-4 pb-10 pt-4 sm:px-6 lg:px-8">
         {loading ? (

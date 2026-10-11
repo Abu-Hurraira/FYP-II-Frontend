@@ -376,6 +376,13 @@ export async function updateAssessmentQuestion(assessmentId, questionId, payload
   });
 }
 
+export async function parseQuestionPaper(assessmentId, teacherUserId) {
+  return await request(
+    `/Assessments/${assessmentId}/parse-question-paper?teacherUserId=${teacherUserId || ""}`,
+    { method: "POST" }
+  );
+}
+
 export async function uploadAssessmentFile(assessmentId, teacherUserId, filePurpose, file) {
   const formData = new FormData();
   formData.append("teacherUserId", String(teacherUserId));

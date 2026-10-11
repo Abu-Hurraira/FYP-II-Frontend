@@ -254,8 +254,11 @@ export default function TeacherFolderUploadScreen() {
                         className="flex items-center rounded-xl border border-gray-100 bg-gray-50 p-3"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {file.fileName ?? file.FileName}
+                          <p className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                            <span className="truncate">{file.fileName ?? file.FileName}</span>
+                            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-800">
+                              Uploaded
+                            </span>
                           </p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-3">
