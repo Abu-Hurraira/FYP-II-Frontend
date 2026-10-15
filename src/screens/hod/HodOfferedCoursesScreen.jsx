@@ -273,16 +273,16 @@ Errors: ${result.errorCount || 0}${errorPreview}`
       </div>
 
       {addChoiceVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setAddChoiceVisible(false)} role="presentation">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-center text-lg font-semibold">Add Offered Courses</h2>
-            <button type="button" onClick={openUploadModal} className="mb-3 w-full rounded-lg py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setAddChoiceVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">Add Offered Courses</h2>
+            <button type="button" onClick={openUploadModal} className="mb-3 min-h-[44px] w-full rounded-xl py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
               Upload Offered Courses File
             </button>
-            <button type="button" onClick={() => openManualModal()} className="w-full rounded-lg py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" onClick={() => openManualModal()} className="min-h-[44px] w-full rounded-xl py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
               New Offered Course
             </button>
-            <button type="button" onClick={() => setAddChoiceVisible(false)} className="mt-4 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setAddChoiceVisible(false)} className="mt-4 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -290,17 +290,17 @@ Errors: ${result.errorCount || 0}${errorPreview}`
       )}
 
       {uploadModalVisible && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-4" onClick={() => setUploadModalVisible(false)} role="presentation">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-lg font-semibold">Upload Offered Courses File</h2>
-            <label className="flex h-12 cursor-pointer items-center rounded-lg bg-gray-100 px-3">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setUploadModalVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">Upload Offered Courses File</h2>
+            <label className="flex min-h-[44px] cursor-pointer items-center rounded-lg bg-gray-100 px-3 text-sm text-gray-700 dark:bg-[#122427] dark:text-gray-300">
               <input type="file" accept=".xlsx" className="hidden" onChange={pickExcelFile} />
               {selectedFile ? selectedFile.name : "Browse"}
             </label>
-            <button type="button" disabled={uploading} onClick={handleUpload} className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" disabled={uploading} onClick={handleUpload} className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.colors.primaryDark }}>
               {uploading ? "…" : "Save"}
             </button>
-            <button type="button" onClick={() => setUploadModalVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setUploadModalVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -308,25 +308,25 @@ Errors: ${result.errorCount || 0}${errorPreview}`
       )}
 
       {manualModalVisible && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-4" onClick={() => setManualModalVisible(false)} role="presentation">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-lg font-semibold">{editingOfferedCourse ? "Edit Offered Course" : "Add New Offered Course"}</h2>
-            <label className="text-sm font-extrabold">Select Teacher</label>
-            <button type="button" onClick={() => setPickerType("teacher")} className="mb-3 mt-1 flex h-12 w-full items-center rounded-lg bg-gray-100 px-3 text-left text-gray-700">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setManualModalVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">{editingOfferedCourse ? "Edit Offered Course" : "Add New Offered Course"}</h2>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Select Teacher</label>
+            <button type="button" onClick={() => setPickerType("teacher")} className="mb-3 mt-1 flex min-h-[44px] w-full items-center rounded-lg bg-gray-100 px-3 text-left text-sm text-gray-700 hover:bg-gray-200 dark:bg-[#122427] dark:text-gray-200">
               {selectedTeacher ? selectedTeacher.fullName : "Choose teacher"}
             </button>
-            <label className="text-sm font-extrabold">Select Course</label>
-            <button type="button" onClick={() => setPickerType("course")} className="mb-3 mt-1 flex h-12 w-full items-center rounded-lg bg-gray-100 px-3 text-left text-gray-700">
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Select Course</label>
+            <button type="button" onClick={() => setPickerType("course")} className="mb-3 mt-1 flex min-h-[44px] w-full items-center rounded-lg bg-gray-100 px-3 text-left text-sm text-gray-700 hover:bg-gray-200 dark:bg-[#122427] dark:text-gray-200">
               {selectedCourse ? selectedCourse.courseTitle : "Choose course"}
             </button>
-            <label className="text-sm font-extrabold">Select Section</label>
-            <button type="button" onClick={() => setPickerType("section")} className="mb-3 mt-1 flex h-12 w-full items-center rounded-lg bg-gray-100 px-3 text-left text-gray-700">
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Select Section</label>
+            <button type="button" onClick={() => setPickerType("section")} className="mb-3 mt-1 flex min-h-[44px] w-full items-center rounded-lg bg-gray-100 px-3 text-left text-sm text-gray-700 hover:bg-gray-200 dark:bg-[#122427] dark:text-gray-200">
               {selectedSection ? selectedSection.sectionName : "Choose section"}
             </button>
-            <button type="button" onClick={handleSaveManualOfferedCourse} className="w-full rounded-lg py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" onClick={handleSaveManualOfferedCourse} className="min-h-[44px] w-full rounded-xl py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
               {editingOfferedCourse ? "Save" : "Add"}
             </button>
-            <button type="button" onClick={() => setManualModalVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setManualModalVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -334,10 +334,13 @@ Errors: ${result.errorCount || 0}${errorPreview}`
       )}
 
       {pickerType !== null && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" onClick={() => setPickerType(null)} role="presentation">
-          <div className="max-h-[70vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="border-b p-4 text-center text-lg font-semibold text-gray-900">{getPickerTitle()}</h2>
-            <div className="max-h-[50vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/55 p-0 sm:p-4 backdrop-blur-xs" onClick={() => setPickerType(null)} role="presentation">
+          <div className="flex max-h-[85dvh] sm:max-h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <div className="border-b p-4 text-center dark:border-[#1b2c2e]">
+              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600 sm:hidden" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{getPickerTitle()}</h2>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {getPickerData().map((item) => (
                 <button
                   key={
@@ -349,15 +352,17 @@ Errors: ${result.errorCount || 0}${errorPreview}`
                   }
                   type="button"
                   onClick={() => handlePickerSelect(item)}
-                  className="block w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-brand-muted/40"
+                  className="block w-full border-b border-gray-100 px-4 py-3 text-left text-sm text-gray-800 hover:bg-brand-muted/40 dark:border-[#1b2c2e] dark:text-gray-200"
                 >
                   {getPickerLabel(item)}
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setPickerType(null)} className="w-full py-3 font-bold text-gray-500">
-              Cancel
-            </button>
+            <div className="border-t p-3 dark:border-[#1b2c2e]">
+              <button type="button" onClick={() => setPickerType(null)} className="min-h-[44px] w-full rounded-xl py-3 font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

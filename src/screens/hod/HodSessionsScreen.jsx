@@ -193,22 +193,22 @@ export default function HodSessionsScreen() {
 
       {modalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               {editing ? "Edit Session" : "Add Session"}
             </h2>
-            <label className="mb-3 block text-sm font-semibold text-gray-700">
+            <label className="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Session title
               <input
-                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                className="mt-1 min-h-[40px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. Spring 2026"
                 value={sessionTitle}
                 onChange={(e) => {
@@ -219,22 +219,22 @@ export default function HodSessionsScreen() {
                 }}
               />
             </label>
-            <label className="mb-4 block text-sm font-semibold text-gray-700">
+            <label className="mb-4 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Academic year
               <input
-                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                className="mt-1 min-h-[40px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. 2026-2030"
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
               />
             </label>
-            <button type="button" onClick={handleSaveSession} className="app-btn-primary w-full py-3">
+            <button type="button" onClick={handleSaveSession} className="app-btn-primary min-h-[44px] w-full py-3 font-extrabold">
               Save
             </button>
             <button
               type="button"
               onClick={() => setModalVisible(false)}
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
             >
               Cancel
             </button>

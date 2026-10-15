@@ -6,7 +6,27 @@ import { deleteGraderAllocation } from "../../api/graderAllocationsApi";
 import { getAuthUserId } from "../../utils/helpers";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 
-const SYSTEM_CODES = new Set(["Attendance", "AssignmentMarks", "QuizMarks", "ComponentMarks"]);
+const SYSTEM_CODES = new Set([
+  "Attendance",
+  "AssignmentMarks",
+  "QuizMarks",
+  "ExamMarks",
+  "ComponentMarks",
+  "Assignment",
+  "Quiz",
+  "ExamSamples",
+]);
+
+const DEFAULT_SYSTEM_TASKS = [
+  { taskCode: "Attendance", label: "Attendance", progressText: "Not allowed yet" },
+  { taskCode: "AssignmentMarks", label: "Assignment marks", progressText: "Not allowed yet" },
+  { taskCode: "QuizMarks", label: "Quiz marks", progressText: "Not allowed yet" },
+  { taskCode: "ExamMarks", label: "Exam marks", progressText: "Not allowed yet" },
+  { taskCode: "ComponentMarks", label: "Component marks", progressText: "Not allowed yet" },
+  { taskCode: "Assignment", label: "Assignment samples", progressText: "Not allowed yet" },
+  { taskCode: "Quiz", label: "Quiz samples", progressText: "Not allowed yet" },
+  { taskCode: "ExamSamples", label: "Exam samples", progressText: "Not allowed yet" },
+];
 
 function draftFromCourse(course) {
   const tasks = course?.tasks || [];
@@ -105,23 +125,29 @@ export default function TeacherGraderTasksScreen() {
   }, [selectedGraders]);
 
   const displaySystemTasks = useMemo(() => {
-    const fromSource = (taskSource?.tasks || []).filter((t) => SYSTEM_CODES.has(t.taskCode));
-    if (fromSource.length > 0) return fromSource;
-    if (page.catalog?.length > 0) {
-      return page.catalog
-        .filter((c) => SYSTEM_CODES.has(c.taskCode))
-        .map((c) => ({
-          taskCode: c.taskCode,
-          label: c.label,
-          progressText: "Not allowed yet",
-        }));
+    const byCode = new Map();
+    for (const task of DEFAULT_SYSTEM_TASKS) {
+      byCode.set(task.taskCode, { ...task });
     }
-    return [
-      { taskCode: "Attendance", label: "Attendance", progressText: "Not allowed yet" },
-      { taskCode: "AssignmentMarks", label: "Assignment marks", progressText: "Not allowed yet" },
-      { taskCode: "QuizMarks", label: "Quiz marks", progressText: "Not allowed yet" },
-      { taskCode: "ComponentMarks", label: "Component marks", progressText: "Not allowed yet" },
-    ];
+    for (const item of page.catalog || []) {
+      if (SYSTEM_CODES.has(item.taskCode)) {
+        byCode.set(item.taskCode, {
+          taskCode: item.taskCode,
+          label: item.label || byCode.get(item.taskCode)?.label || item.taskCode,
+          progressText: "Not allowed yet",
+        });
+      }
+    }
+    for (const task of taskSource?.tasks || []) {
+      if (SYSTEM_CODES.has(task.taskCode)) {
+        byCode.set(task.taskCode, {
+          taskCode: task.taskCode,
+          label: task.label || byCode.get(task.taskCode)?.label || task.taskCode,
+          progressText: task.progressText || "Not allowed yet",
+        });
+      }
+    }
+    return DEFAULT_SYSTEM_TASKS.map((task) => byCode.get(task.taskCode) || task);
   }, [taskSource, page.catalog]);
 
   const toggleGrader = (id) => {
@@ -254,7 +280,7 @@ export default function TeacherGraderTasksScreen() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-6">
+      <div className="w-full space-y-4 px-4 py-6 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
@@ -382,152 +408,156 @@ export default function TeacherGraderTasksScreen() {
                   </div>
                 )}
 
-                <div className="mt-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-extrabold text-gray-700 dark:text-gray-300">
-                        Courses {selectedCourses.length > 0 && `(${selectedCourses.length} selected)`}
-                      </p>
-                      <p className="text-xs text-gray-500">Select every course this task list should apply to.</p>
-                    </div>
-                    {courses.length > 1 && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={selectAllCourses}
-                          className="font-bold text-emerald-700 hover:underline dark:text-emerald-400"
-                        >
-                          Select all
-                        </button>
-                        <span className="text-gray-300 dark:text-gray-600">·</span>
-                        <button
-                          type="button"
-                          onClick={deselectAllCourses}
-                          className="font-medium text-gray-500 hover:underline dark:text-gray-400"
-                        >
-                          Clear
-                        </button>
+                <div className="mt-4 grid gap-5 lg:grid-cols-2 lg:items-start">
+                  <div className="min-w-0">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-extrabold text-gray-700 dark:text-gray-300">
+                          Courses {selectedCourses.length > 0 && `(${selectedCourses.length} selected)`}
+                        </p>
+                        <p className="text-xs text-gray-500">Select every course this task list should apply to.</p>
                       </div>
+                      {courses.length > 1 && (
+                        <div className="flex shrink-0 items-center gap-2 text-xs">
+                          <button
+                            type="button"
+                            onClick={selectAllCourses}
+                            className="font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+                          >
+                            Select all
+                          </button>
+                          <span className="text-gray-300 dark:text-gray-600">·</span>
+                          <button
+                            type="button"
+                            onClick={deselectAllCourses}
+                            className="font-medium text-gray-500 hover:underline dark:text-gray-400"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {courses.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No offered courses found.</p>
+                    ) : (
+                      <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                        {courses.map((course) => {
+                          const id = String(course.offeredCourseId);
+                          const checked = selectedCourseIds.has(id);
+                          return (
+                            <li key={id}>
+                              <label
+                                className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 transition-colors ${
+                                  checked
+                                    ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/20"
+                                    : "border-gray-100 hover:bg-gray-50 dark:border-[#1b2c2e] dark:hover:bg-[#122225]"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 h-4 w-4 accent-emerald-600"
+                                  checked={checked}
+                                  onChange={() => toggleCourse(course.offeredCourseId)}
+                                />
+                                <span>
+                                  <span className="block text-sm font-bold text-gray-900 dark:text-white">
+                                    {course.courseTitle}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {course.courseCode} · {course.sectionName}
+                                  </span>
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     )}
                   </div>
-                  {courses.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">No offered courses found.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {courses.map((course) => {
-                        const id = String(course.offeredCourseId);
-                        const checked = selectedCourseIds.has(id);
-                        return (
-                          <li key={id}>
-                            <label
-                              className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 transition-colors ${
-                                checked
-                                  ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/20"
-                                  : "border-gray-100 hover:bg-gray-50 dark:border-[#1b2c2e] dark:hover:bg-[#122225]"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                className="mt-1 h-4 w-4 accent-emerald-600"
-                                checked={checked}
-                                onChange={() => toggleCourse(course.offeredCourseId)}
-                              />
-                              <span>
-                                <span className="block text-sm font-bold text-gray-900 dark:text-white">
-                                  {course.courseTitle}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {course.courseCode} · {course.sectionName}
-                                </span>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-extrabold text-gray-900 dark:text-white">Allowed tasks</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Tick built-in work, or add your own lines. Save applies this list to every selected course and grader.
+                    </p>
+
+                    <ul className="mt-3 max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                      {displaySystemTasks.map((task) => (
+                        <li key={task.taskCode}>
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-4 w-4 accent-emerald-600"
+                              checked={selectedCodes.has(task.taskCode)}
+                              onChange={() => toggle(task.taskCode)}
+                            />
+                            <span>
+                              <span className="block text-sm font-bold text-gray-900 dark:text-white">{task.label}</span>
+                              <span className="mt-0.5 block text-xs text-gray-500">
+                                {selectedCodes.has(task.taskCode)
+                                  ? selectedGraders.length > 1 || selectedCourses.length > 1
+                                    ? "Allowed"
+                                    : task.progressText || "Allowed"
+                                  : "Not allowed yet"}
                               </span>
-                            </label>
-                          </li>
-                        );
-                      })}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
                     </ul>
-                  )}
-                </div>
 
-                <p className="mt-5 text-sm font-extrabold text-gray-900 dark:text-white">Allowed tasks</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Tick built-in work, or add your own lines. Save applies this list to every selected course and grader.
-                </p>
+                    <ul className="mt-3 space-y-2">
+                      {customTasks.map((task, index) => (
+                        <li
+                          key={`${task.taskCode}-${index}`}
+                          className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-[#122225]"
+                        >
+                          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-emerald-600"
+                              checked={Boolean(task.selected)}
+                              onChange={() =>
+                                setCustomTasks((prev) =>
+                                  prev.map((item, i) => (i === index ? { ...item, selected: !item.selected } : item))
+                                )
+                              }
+                            />
+                            <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">{task.title}</span>
+                          </label>
+                          <button
+                            type="button"
+                            className="text-xs font-bold text-red-600"
+                            onClick={() => setCustomTasks((prev) => prev.filter((_, i) => i !== index))}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
 
-                <ul className="mt-3 space-y-3">
-                  {displaySystemTasks.map((task) => (
-                    <li key={task.taskCode}>
-                      <label className="flex cursor-pointer items-start gap-3">
-                        <input
-                          type="checkbox"
-                          className="mt-1 h-4 w-4 accent-emerald-600"
-                          checked={selectedCodes.has(task.taskCode)}
-                          onChange={() => toggle(task.taskCode)}
-                        />
-                        <span>
-                          <span className="block text-sm font-bold text-gray-900 dark:text-white">{task.label}</span>
-                          <span className="mt-0.5 block text-xs text-gray-500">
-                            {selectedCodes.has(task.taskCode)
-                              ? selectedGraders.length > 1 || selectedCourses.length > 1
-                                ? "Allowed"
-                                : task.progressText || "Allowed"
-                              : "Not allowed yet"}
-                          </span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-
-                <ul className="mt-3 space-y-2">
-                  {customTasks.map((task, index) => (
-                    <li
-                      key={`${task.taskCode}-${index}`}
-                      className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-[#122225]"
-                    >
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 accent-emerald-600"
-                          checked={Boolean(task.selected)}
-                          onChange={() =>
-                            setCustomTasks((prev) =>
-                              prev.map((item, i) => (i === index ? { ...item, selected: !item.selected } : item))
-                            )
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        value={newTask}
+                        onChange={(e) => setNewTask(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addCustomTask();
                           }
-                        />
-                        <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">{task.title}</span>
-                      </label>
+                        }}
+                        placeholder="Add your own task"
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-[#1b2c2e] dark:bg-[#071113]"
+                      />
                       <button
                         type="button"
-                        className="text-xs font-bold text-red-600"
-                        onClick={() => setCustomTasks((prev) => prev.filter((_, i) => i !== index))}
+                        onClick={addCustomTask}
+                        className="shrink-0 rounded-xl border border-emerald-300 px-3 py-2 text-sm font-bold text-emerald-800 dark:border-emerald-700 dark:text-emerald-300"
                       >
-                        Remove
+                        Add
                       </button>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-3 flex gap-2">
-                  <input
-                    value={newTask}
-                    onChange={(e) => setNewTask(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addCustomTask();
-                      }
-                    }}
-                    placeholder="Add your own task"
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-[#1b2c2e] dark:bg-[#071113]"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCustomTask}
-                    className="shrink-0 rounded-xl border border-emerald-300 px-3 py-2 text-sm font-bold text-emerald-800 dark:border-emerald-700 dark:text-emerald-300"
-                  >
-                    Add
-                  </button>
+                    </div>
+                  </div>
                 </div>
 
                 <button

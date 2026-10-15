@@ -151,7 +151,7 @@ export default function TeacherLabMarksMappingScreen({ embedded = false }) {
             <p className="mt-1 text-xs font-medium text-gray-500">
               All items including extras must total {target}. Marks above {target} are not allowed.
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {COLUMNS.map((col) => (
                 <label key={col.key} className="block text-xs font-extrabold text-gray-700">
                   {col.label}

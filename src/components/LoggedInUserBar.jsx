@@ -25,6 +25,8 @@ export default function LoggedInUserBar({
   roleFallback = "User",
   profilePath,
   notificationsPath = null,
+  leading = null,
+  onMenuClick = null,
 }) {
   const { user } = useContext(AuthContext);
   const location = useLocation();
@@ -61,7 +63,25 @@ export default function LoggedInUserBar({
   const initial = displayName.charAt(0).toUpperCase() || "U";
 
   return (
-    <div className="app-header-bar">
+    <div className={`app-header-bar ${leading || onMenuClick ? "!justify-between gap-2 sm:gap-3" : ""}`}>
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-gray-700 transition hover:bg-brand-muted hover:text-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 lg:hidden dark:text-gray-200"
+            aria-label="Open navigation menu"
+            title="Open menu"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
+        {leading}
+      </div>
+
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
       <ThemeToggle />
 
       {notificationsPath ? (
@@ -90,6 +110,7 @@ export default function LoggedInUserBar({
       ) : (
         <div className="app-header-avatar">{initial}</div>
       )}
+      </div>
     </div>
   );
 }

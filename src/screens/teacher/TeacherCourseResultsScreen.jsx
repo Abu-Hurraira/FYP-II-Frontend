@@ -164,7 +164,29 @@ export default function TeacherCourseResultsScreen() {
   const handleMarkChange = (index, field, rawValue) => {
     const updated = [...editableRows];
     const row = { ...updated[index] };
-    const num = Math.max(0, Number(rawValue) || 0);
+    let num = Math.max(0, Number(rawValue) || 0);
+
+    let maxAllowed = Infinity;
+    let label = field;
+    if (field === "midMarks") {
+      maxAllowed = midMax;
+      label = "Mid marks";
+    } else if (field === "homeworkMarks") {
+      maxAllowed = hwMax;
+      label = "HW marks";
+    } else if (field === "finalMarks") {
+      maxAllowed = finalMax;
+      label = "Final marks";
+    } else if (field === "labMarks") {
+      maxAllowed = hasLab ? labMax : 0;
+      label = "Lab marks";
+    }
+
+    if (Number.isFinite(maxAllowed) && num > maxAllowed) {
+      num = maxAllowed;
+      showAlert("Maximum marks exceeded", `${label} cannot exceed maximum (${maxAllowed}). Automatically capped at ${maxAllowed}.`);
+    }
+
     row[field] = num;
 
     const mid = Number(row.midMarks || 0);
@@ -218,6 +240,25 @@ export default function TeacherCourseResultsScreen() {
 
   const handleSaveChanges = async () => {
     try {
+      for (const r of editableRows) {
+        if (Number(r.midMarks || 0) > midMax) {
+          showAlert("Invalid marks", `Mid marks for ${r.aridNo} exceed maximum ${midMax}.`);
+          return;
+        }
+        if (Number(r.homeworkMarks || 0) > hwMax) {
+          showAlert("Invalid marks", `HW marks for ${r.aridNo} exceed maximum ${hwMax}.`);
+          return;
+        }
+        if (Number(r.finalMarks || 0) > finalMax) {
+          showAlert("Invalid marks", `Final marks for ${r.aridNo} exceed maximum ${finalMax}.`);
+          return;
+        }
+        if (hasLab && Number(r.labMarks || 0) > labMax) {
+          showAlert("Invalid marks", `Lab marks for ${r.aridNo} exceed maximum ${labMax}.`);
+          return;
+        }
+      }
+
       setSavingMarks(true);
       const entries = editableRows.map((r) => ({
         studentId: r.studentId,
@@ -280,7 +321,7 @@ export default function TeacherCourseResultsScreen() {
   return (
     <div className="relative min-h-full bg-page pb-12">
       <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8 dark:border-[#1b2c2e] dark:bg-[#071113]">
-        <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <PageBackButton className="mt-0.5 shrink-0" />
             <div className="min-w-0">
@@ -289,7 +330,7 @@ export default function TeacherCourseResultsScreen() {
             </div>
           </div>
           {editableRows.length ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleSaveChanges}
@@ -368,7 +409,7 @@ export default function TeacherCourseResultsScreen() {
             <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
               <h2 className="text-lg font-black text-gray-900 dark:text-white">Best-of</h2>
               <p className="mt-1 text-xs font-medium text-gray-500">How many best assignments and quizzes to keep.</p>
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="text-xs font-extrabold text-gray-700 dark:text-gray-300">
                   Best assignments
                   <input className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#071113] dark:text-white" placeholder="e.g. 3" value={assignmentBestOf} onChange={(e) => setAssignmentBestOf(e.target.value.replace(/[^0-9]/g, ""))} />
@@ -429,7 +470,7 @@ export default function TeacherCourseResultsScreen() {
                     <h2 className="text-lg font-black text-gray-900 dark:text-white">Award List Sheet (Editable)</h2>
                     <p className="text-xs font-medium text-gray-500">Edit marks directly below — Totals, Grades, QPoints & Words recalculate automatically in real-time.</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={handleSaveChanges}
@@ -451,7 +492,7 @@ export default function TeacherCourseResultsScreen() {
                   </div>
                 </div>
 
-                <div id="award-list-document" className="overflow-x-auto rounded-xl border border-gray-400 bg-white p-6 shadow-lg text-gray-900 font-sans">
+                <div id="award-list-document" className="w-full max-w-full rounded-xl border border-gray-400 bg-white p-3 sm:p-6 shadow-lg text-gray-900 font-sans">
                   {/* Title Header */}
                   <div className="text-center font-bold">
                     <h2 className="text-lg font-black uppercase tracking-wider text-gray-900">PMAS ARID AGRICULTURE UNIVERSITY RAWALPINDI</h2>
@@ -459,7 +500,7 @@ export default function TeacherCourseResultsScreen() {
                   </div>
 
                   {/* Subheader Metadata */}
-                  <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-1 text-xs font-extrabold border-b border-gray-300 pb-3 text-gray-900">
+                  <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-1 text-xs font-extrabold border-b border-gray-300 pb-3 text-gray-900 sm:grid-cols-2">
                     <div className="space-y-1">
                       <div className="flex"><span className="w-24 shrink-0 font-extrabold">Course No :</span><span className="font-bold">{courseCode || "N/A"}</span></div>
                       <div className="flex"><span className="w-24 shrink-0 font-extrabold">Course :</span><span className="font-bold uppercase">{courseTitle || "N/A"}</span></div>
@@ -474,8 +515,8 @@ export default function TeacherCourseResultsScreen() {
                   </div>
 
                   {/* Main Award List Table */}
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="w-full border-collapse border border-black text-center text-xs font-medium text-gray-900">
+                  <div className="mt-4 w-full max-w-full overflow-x-auto">
+                    <table className="min-w-[860px] w-full border-collapse border border-black text-center text-xs font-medium text-gray-900">
                       <thead>
                         <tr className="bg-gray-100 font-extrabold border-b border-black">
                           <th rowSpan={3} className="border border-black px-1.5 py-1 w-10">Sr No.</th>

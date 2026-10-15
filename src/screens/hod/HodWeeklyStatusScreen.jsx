@@ -52,7 +52,7 @@ export default function HodWeeklyStatusScreen() {
   const offeredCourseId = Number(oc);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [expandedWeekId, setExpandedWeekId] = useState(null);
+  const [expandedWeeks, setExpandedWeeks] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -68,6 +68,24 @@ export default function HodWeeklyStatusScreen() {
   }, [offeredCourseId]);
 
   const weeks = data?.weeks ?? [];
+  const weekGroups = (() => {
+    const map = new Map();
+    for (const topic of weeks) {
+      const weekNo = topic.weekNo != null ? Number(topic.weekNo) : 0;
+      if (!map.has(weekNo)) map.set(weekNo, []);
+      map.get(weekNo).push(topic);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([weekNo, topics]) => ({ weekNo, topics }));
+  })();
+
+  const toggleWeek = (weekNo) => {
+    setExpandedWeeks((prev) => ({
+      ...prev,
+      [weekNo]: !(prev[weekNo] ?? true),
+    }));
+  };
 
   return (
     <div className="relative min-h-full bg-page pb-24">
@@ -93,59 +111,137 @@ export default function HodWeeklyStatusScreen() {
           />
         </div>
       ) : (
-        <div className="w-full px-4 py-4 sm:px-6 lg:px-8">
-          {weeks.length === 0 ? (
+        <div className="w-full space-y-4 px-4 py-4 sm:px-6 lg:px-8">
+          {weekGroups.length === 0 ? (
             <p className="py-16 text-center text-gray-500">No weekly content uploaded yet.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-              {weeks.map((week, index) => {
-                const expanded = expandedWeekId === week.topicId;
-                const weekNo = week.weekNo != null ? Number(week.weekNo) : index + 1;
-                const subTopicCount = week.children?.length ?? 0;
-                const coverage = getTopicCoverageDetails(week);
-
-                return (
-                  <div key={week.topicId} className="border-b border-gray-200 last:border-b-0">
-                    <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedWeekId(expanded ? null : week.topicId)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <p className="text-sm font-semibold text-gray-900">
-                          Week {String(weekNo).padStart(2, "0")} — {week.topicTitle}
-                        </p>
-                        <p className="mt-0.5 text-xs text-gray-500">
-                          {subTopicCount} sub-topic{subTopicCount === 1 ? "" : "s"} · {coverage.label}
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedWeekId(expanded ? null : week.topicId)}
-                        className="px-1 text-gray-400 hover:text-gray-700"
-                        aria-expanded={expanded}
-                      >
-                        <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
-                      </button>
+            weekGroups.map(({ weekNo, topics }) => {
+              const expanded = expandedWeeks[weekNo] ?? false;
+              const label = weekNo > 0 ? `Week ${String(weekNo).padStart(2, "0")}` : "Other topics";
+              let doneCount = 0;
+              let totalCount = 0;
+              for (const topic of topics) {
+                const details = getTopicCoverageDetails(topic);
+                doneCount += details.doneCount;
+                totalCount += details.totalCount;
+              }
+              const weekStatus =
+                totalCount > 0 && doneCount === totalCount
+                  ? "complete"
+                  : doneCount > 0
+                    ? "partial"
+                    : "pending";
+              const weekLabel =
+                weekStatus === "complete"
+                  ? "Complete"
+                  : weekStatus === "partial"
+                    ? `Partial (${doneCount}/${totalCount})`
+                    : "Not complete";
+              const headerTone =
+                weekStatus === "complete"
+                  ? "border-emerald-200 bg-emerald-50"
+                  : weekStatus === "partial"
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-gray-200 bg-slate-50";
+              const statusTone =
+                weekStatus === "complete"
+                  ? "text-emerald-700"
+                  : weekStatus === "partial"
+                    ? "text-amber-700"
+                    : "text-gray-500";
+              return (
+                <div
+                  key={`week-${weekNo}`}
+                  className={`overflow-hidden rounded-xl border bg-white ${
+                    weekStatus === "complete"
+                      ? "border-emerald-200"
+                      : weekStatus === "partial"
+                        ? "border-amber-200"
+                        : "border-gray-200"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleWeek(weekNo)}
+                    className={`flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left ${headerTone}`}
+                  >
+                    <div>
+                      <p className="text-sm font-extrabold text-gray-900">{label}</p>
+                      <p className={`mt-0.5 text-xs font-semibold ${statusTone}`}>
+                        {topics.length} topic{topics.length === 1 ? "" : "s"} · {weekLabel}
+                      </p>
                     </div>
-
-                    {expanded ? (
-                      <div className="border-t border-gray-100 bg-gray-50/60">
-                        {(week.children?.length ?? 0) > 0 ? (
-                          week.children.map((child) => (
-                            <TopicReadOnly key={child.topicId} topic={child} level={0} />
-                          ))
-                        ) : (
-                          <p className="px-4 py-3 text-sm text-gray-500">
-                            {isTopicFullyCovered(week) ? "Week marked complete." : "Week not yet complete."}
-                          </p>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+                    <span className={`inline-block text-gray-400 transition-transform ${expanded ? "rotate-90" : ""}`}>
+                      ›
+                    </span>
+                  </button>
+                  {expanded
+                    ? topics.map((topic) => {
+                        const topicExpanded = expandedWeeks[`t-${topic.topicId}`] ?? false;
+                        const subTopicCount = topic.children?.length ?? 0;
+                        const coverage = getTopicCoverageDetails(topic);
+                        return (
+                          <div key={topic.topicId} className="border-b border-gray-200 last:border-b-0">
+                            <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedWeeks((prev) => ({
+                                    ...prev,
+                                    [`t-${topic.topicId}`]: !topicExpanded,
+                                  }))
+                                }
+                                className="min-w-0 flex-1 text-left"
+                              >
+                                <p className="text-sm font-semibold text-gray-900">{topic.topicTitle}</p>
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  {subTopicCount} sub-topic{subTopicCount === 1 ? "" : "s"} · {coverage.label}
+                                </p>
+                              </button>
+                              {(topic.children?.length ?? 0) > 0 || isTopicFullyCovered(topic) ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedWeeks((prev) => ({
+                                      ...prev,
+                                      [`t-${topic.topicId}`]: !topicExpanded,
+                                    }))
+                                  }
+                                  className="px-1 text-gray-400 hover:text-gray-700"
+                                  aria-expanded={topicExpanded}
+                                >
+                                  <span
+                                    className={`inline-block transition-transform ${topicExpanded ? "rotate-90" : ""}`}
+                                  >
+                                    ›
+                                  </span>
+                                </button>
+                              ) : null}
+                            </div>
+                            {topicExpanded ? (
+                              <div className="border-t border-gray-100 bg-gray-50/60 pl-6 sm:pl-8">
+                                {(topic.children?.length ?? 0) > 0 ? (
+                                  <div className="ml-2 border-l-2 border-emerald-200/80">
+                                    {topic.children.map((child) => (
+                                      <TopicReadOnly key={child.topicId} topic={child} level={0} />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="px-4 py-3 text-sm text-gray-500">
+                                    {isTopicFullyCovered(topic)
+                                      ? "Topic marked complete."
+                                      : "Topic not yet complete."}
+                                  </p>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    : null}
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -157,7 +253,7 @@ function TopicReadOnly({ topic, level }) {
   const [expanded, setExpanded] = useState(false);
   const hasChildren = (topic.children?.length ?? 0) > 0;
   const done = isTopicFullyCovered(topic);
-  const pad = 16 + level * 18;
+  const pad = 20 + level * 22;
 
   return (
     <div>

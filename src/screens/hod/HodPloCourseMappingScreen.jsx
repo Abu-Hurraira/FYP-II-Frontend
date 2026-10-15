@@ -355,11 +355,11 @@ export default function HodPloCourseMappingScreen() {
             No program courses found. Link courses under Program → Courses first.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
-            <table className="min-w-full border-collapse text-sm">
+          <div className="w-full max-w-full overflow-x-auto rounded-2xl border border-gray-100 bg-white dark:bg-[#0c181a] dark:border-white/10 shadow-card">
+            <table className="min-w-max w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-amber-50">
-                  <th className="sticky left-0 z-20 min-w-[180px] border-r border-gray-200 bg-amber-50 px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-gray-600">
+                <tr className="border-b border-gray-200 dark:border-white/10 bg-amber-50 dark:bg-[#1f1b13]">
+                  <th className="sticky left-0 z-20 min-w-[130px] sm:min-w-[180px] max-w-[200px] border-r border-gray-200 dark:border-white/10 bg-amber-50 dark:bg-[#1f1b13] px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-amber-300 shadow-[2px_0_4px_rgba(0,0,0,0.06)]">
                     Total %
                   </th>
                   {sortedPlos.map((plo) => {
@@ -369,10 +369,10 @@ export default function HodPloCourseMappingScreen() {
                         key={`total-${plo.ploId}`}
                         className={`min-w-[72px] px-2 py-2 text-center text-xs font-bold ${
                           total === 100
-                            ? "text-emerald-700"
+                            ? "text-emerald-700 dark:text-emerald-400"
                             : total > 100
-                              ? "text-red-600"
-                              : "text-gray-700"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-gray-700 dark:text-gray-300"
                         }`}
                       >
                         {total}%
@@ -380,14 +380,14 @@ export default function HodPloCourseMappingScreen() {
                     );
                   })}
                 </tr>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="sticky left-0 z-20 min-w-[180px] border-r border-gray-200 bg-gray-50 px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600">
+                <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#102023]">
+                  <th className="sticky left-0 z-20 min-w-[130px] sm:min-w-[180px] max-w-[200px] border-r border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#102023] px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 shadow-[2px_0_4px_rgba(0,0,0,0.06)]">
                     Course
                   </th>
                   {sortedPlos.map((plo, index) => (
                     <th
                       key={plo.ploId}
-                      className="min-w-[72px] max-w-[120px] px-2 py-3 text-center text-xs font-semibold text-gray-700"
+                      className="min-w-[72px] max-w-[120px] px-2 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300"
                       title={plo.ploDescription || ""}
                     >
                       {ploDisplayLabel(plo, index)}
@@ -400,11 +400,11 @@ export default function HodPloCourseMappingScreen() {
                   const pcKey = String(course.programCourseId);
                   const row = getCourseRow(matrix, pcKey, sortedPlos);
                   return (
-                    <tr key={pcKey} className="border-b border-gray-100 hover:bg-brand-muted/40">
-                      <td className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-3">
-                        <p className="font-semibold text-gray-900">{course.courseTitle}</p>
+                    <tr key={pcKey} className="border-b border-gray-100 dark:border-white/5 hover:bg-brand-muted/40">
+                      <td className="sticky left-0 z-10 min-w-[130px] sm:min-w-[180px] max-w-[200px] border-r border-gray-200 dark:border-white/10 bg-white dark:bg-[#0c181a] px-3 py-3 shadow-[2px_0_4px_rgba(0,0,0,0.06)]">
+                        <p className="font-semibold text-gray-900 dark:text-white leading-tight">{course.courseTitle}</p>
                         {course.courseCode ? (
-                          <p className="text-xs text-gray-500">{course.courseCode}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{course.courseCode}</p>
                         ) : null}
                       </td>
                       {sortedPlos.map((plo, ploIndex) => {

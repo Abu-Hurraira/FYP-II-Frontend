@@ -619,14 +619,15 @@ const GraderAllocationsScreen = () => {
       </div>
 
       {modalVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={closeAssignModal} role="presentation">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 p-0 sm:p-4 backdrop-blur-xs" onClick={closeAssignModal} role="presentation">
           <div
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl shadow-xl"
+            className="flex max-h-[92dvh] sm:max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl sm:rounded-2xl shadow-xl"
             style={{ backgroundColor: "var(--surface)" }}
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <div className="border-b px-6 py-4" style={{ borderColor: "var(--border)" }}>
+            <div className="border-b px-4 py-3 sm:px-6 sm:py-4" style={{ borderColor: "var(--border)" }}>
+              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600 sm:hidden" />
               <h2 className="text-center text-lg font-semibold" style={{ color: "var(--text)" }}>Assign grader to teacher</h2>
               <p className="mt-1 text-center text-xs" style={{ color: "var(--text-muted)" }}>
                 Nominated students are listed below. Tick who to assign, pick a teacher, then Assign. The Grader badge is added after assignment.
@@ -636,11 +637,11 @@ const GraderAllocationsScreen = () => {
               ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
               <div>
                 <label className="text-sm font-extrabold" style={{ color: "var(--text)" }}>Search teacher by email</label>
                 <input
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                   style={{ backgroundColor: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
                   value={teacherSearch}
                   onChange={(e) => setTeacherSearch(e.target.value)}
@@ -789,7 +790,7 @@ const GraderAllocationsScreen = () => {
               </div>
             </div>
 
-            <div className="border-t px-6 py-4" style={{ borderColor: "var(--border)" }}>
+            <div className="border-t px-4 py-3 sm:px-6 sm:py-4" style={{ borderColor: "var(--border)" }}>
               <button
                 type="button"
                 disabled={
@@ -800,7 +801,7 @@ const GraderAllocationsScreen = () => {
                   registeredStudents.length === 0
                 }
                 onClick={saveAllocation}
-                className="w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+                className="min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
                 style={{ backgroundColor: theme.colors.primaryDark }}
               >
                 {assignSaving
@@ -809,7 +810,7 @@ const GraderAllocationsScreen = () => {
                     ? `Assign ${selectedGraderIds.size} Graders`
                     : "Assign Grader"}
               </button>
-              <button type="button" onClick={closeAssignModal} className="mt-3 w-full font-bold text-gray-500">
+              <button type="button" onClick={closeAssignModal} className="mt-2 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
                 Close
               </button>
             </div>
@@ -819,31 +820,32 @@ const GraderAllocationsScreen = () => {
 
       {manualGraderModalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 p-0 sm:p-4 backdrop-blur-xs"
           onClick={() => setManualGraderModalVisible(false)}
           role="presentation"
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl shadow-xl"
+            className="flex max-h-[92dvh] sm:max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl sm:rounded-2xl shadow-xl"
             style={{ backgroundColor: "var(--surface)" }}
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <div className="relative border-b px-6 py-4" style={{ borderColor: "var(--border)" }}>
+            <div className="relative border-b px-4 py-3 sm:px-6 sm:py-4" style={{ borderColor: "var(--border)" }}>
+              <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600 sm:hidden" />
               <h2 className="text-center text-lg font-semibold" style={{ color: "var(--text)" }}>Nominate student as grader</h2>
-              <p className="mt-1 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+              <p className="mt-1 text-center text-xs sm:text-sm" style={{ color: "var(--text-muted)" }}>
                 Tick to select, untick to deselect. The Grader badge appears only after assignment to a teacher.
               </p>
               <button
                 type="button"
-                className="absolute right-4 top-3 text-2xl text-gray-500"
+                className="absolute right-4 top-3 text-2xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
                 onClick={() => setManualGraderModalVisible(false)}
               >
                 ×
               </button>
             </div>
 
-            <div className="space-y-3 border-b px-6 py-4" style={{ borderColor: "var(--border)" }}>
+            <div className="space-y-3 border-b px-4 py-3 sm:px-6 sm:py-4" style={{ borderColor: "var(--border)" }}>
               <label className="text-sm font-extrabold" style={{ color: "var(--text)" }}>Program</label>
               <AppSelect
                 className="w-full rounded-lg border px-3 py-2"
@@ -933,11 +935,11 @@ const GraderAllocationsScreen = () => {
               )}
             </div>
 
-            <div className="border-t border-gray-100 px-6 py-4">
+            <div className="border-t border-gray-100 px-4 py-3 sm:px-6 sm:py-4 dark:border-[#1b2c2e]">
               <button
                 type="button"
                 onClick={() => setManualGraderModalVisible(false)}
-                className="w-full font-bold text-gray-500"
+                className="min-h-[44px] w-full rounded-xl font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
               >
                 Close
               </button>
@@ -948,24 +950,24 @@ const GraderAllocationsScreen = () => {
 
       {graderImportModalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs"
           onClick={() => setGraderImportModalVisible(false)}
           role="presentation"
         >
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
             <div className="mb-4 flex items-start justify-between gap-2">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Add grader (Excel)</h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Add grader (Excel)</h2>
+                <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Upload a .xlsx file with student ARIDs from the selected program. Each valid row creates a grader user.
                 </p>
               </div>
-              <button type="button" onClick={() => setGraderImportModalVisible(false)} className="text-2xl text-gray-500">
+              <button type="button" onClick={() => setGraderImportModalVisible(false)} className="text-2xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
                 ×
               </button>
             </div>
 
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-[#1b2c2e] dark:bg-[#122427]">
               <p className="text-xs font-extrabold uppercase tracking-wide text-gray-600">Sample file format</p>
               <p className="mt-1 text-xs text-gray-500">Use column headers <strong>ARID</strong> and/or <strong>Email</strong>:</p>
               <div className="mt-2 overflow-x-auto">

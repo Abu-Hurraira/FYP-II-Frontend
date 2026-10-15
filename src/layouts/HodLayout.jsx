@@ -1,10 +1,13 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext.jsx";
+import { HodProgramProvider, useHodProgram } from "../context/HodProgramContext.jsx";
 import LoggedInUserBar from "../components/LoggedInUserBar.jsx";
 import AppBrandMark from "../components/AppBrandMark.jsx";
+import AppSelect from "../components/AppSelect.jsx";
 import { getAuthDisplayName, getAuthRoleLabel } from "../utils/helpers";
 import { sidebarNavClassFromActive } from "../styles/sidebarNav";
+import { useSidebarDrawer } from "../hooks/useSidebarDrawer";
 
 function normalizePath(path) {
   return String(path || "/").replace(/\/+$/, "") || "/";
@@ -68,31 +71,118 @@ function SidebarIconClipboard() {
   );
 }
 
-export default function HodLayout() {
+function programOptionLabel(program) {
+  const code = String(program.programCode || "").trim();
+  const name = String(program.programName || "").trim();
+  if (code && name) return `${code} — ${name}`;
+  return name || code || `Program ${program.programId}`;
+}
+
+function HodProgramSwitcher() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { programs, selectedProgramId, selectedProgram, loading, setSelectedProgramId } = useHodProgram();
+
+  // Keep context in sync when browsing nested /hod/program/:programId routes
+  useEffect(() => {
+    const match = pathname.match(/^\/hod\/program\/(\d+)/);
+    if (!match) return;
+    const id = Number(match[1]);
+    if (Number.isFinite(id) && id > 0 && id !== selectedProgramId) {
+      setSelectedProgramId(id);
+    }
+  }, [pathname, selectedProgramId, setSelectedProgramId]);
+
+  const handleChange = (e) => {
+    const nextId = Number(e.target.value);
+    if (!Number.isFinite(nextId) || nextId <= 0) return;
+    const nextProgram = programs.find((p) => p.programId === nextId);
+    setSelectedProgramId(nextId);
+
+    if (pathname.startsWith("/hod/program/")) {
+      navigate(`/hod/program/${nextId}/menu`, {
+        replace: true,
+        state: { program: nextProgram },
+      });
+    }
+  };
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="hidden min-w-0 sm:block">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Active program</p>
+        <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+          {loading
+            ? "Loading…"
+            : selectedProgram
+              ? programOptionLabel(selectedProgram)
+              : "No programs yet"}
+        </p>
+      </div>
+      <AppSelect
+        value={selectedProgramId ?? ""}
+        onChange={handleChange}
+        disabled={loading || programs.length === 0}
+        className="w-full max-w-[8.5rem] sm:max-w-[14rem] rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-semibold text-gray-800 outline-none dark:border-[#1b2c2e] dark:bg-[#0d181a] dark:text-gray-100"
+        emptyLabel="No programs"
+      >
+        {programs.map((p) => (
+          <option key={p.programId} value={p.programId}>
+            {programOptionLabel(p)}
+          </option>
+        ))}
+      </AppSelect>
+    </div>
+  );
+}
+
+function HodLayoutInner() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { sidebarOpen, openSidebar, closeSidebar } = useSidebarDrawer();
 
   const displayName = getAuthDisplayName(user, "HOD");
   const roleLabel = getAuthRoleLabel(user, "HOD");
 
   const handleLogout = async () => {
+    closeSidebar();
     await logout();
     navigate("/login", { replace: true });
   };
 
   return (
     <div className="flex min-h-screen bg-page">
-      <aside className="app-sidebar">
-        <div className="app-sidebar-brand">
-          <AppBrandMark />
-          <div>
-            <p className="text-sm font-bold text-white">Folder Management</p>
-            <p className="text-xs font-medium text-white/70">System</p>
+      {sidebarOpen && (
+        <div
+          className="app-sidebar-backdrop"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`app-sidebar${sidebarOpen ? " app-sidebar--open" : ""}`}>
+        <div className="app-sidebar-brand justify-between">
+          <div className="flex items-center gap-3">
+            <AppBrandMark />
+            <div>
+              <p className="text-sm font-bold text-white">Folder Management</p>
+              <p className="text-xs font-medium text-white/70">System</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white lg:hidden"
+            aria-label="Close navigation menu"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        <nav className="app-sidebar-nav">
+        <nav className="app-sidebar-nav" onClick={closeSidebar}>
           <NavLink to="/hod" end className={sidebarNavClassFromActive(isExactPath(pathname, "/hod"))}>
             <SidebarIconGrid />
             Home
@@ -146,9 +236,19 @@ export default function HodLayout() {
           roleFallback="HOD"
           profilePath="/hod/profile"
           notificationsPath="/hod/notifications"
+          leading={<HodProgramSwitcher />}
+          onMenuClick={openSidebar}
         />
         <Outlet />
       </main>
     </div>
+  );
+}
+
+export default function HodLayout() {
+  return (
+    <HodProgramProvider>
+      <HodLayoutInner />
+    </HodProgramProvider>
   );
 }

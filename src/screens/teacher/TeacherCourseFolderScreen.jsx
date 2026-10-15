@@ -115,7 +115,7 @@ export default function TeacherCourseFolderScreen() {
     if (
       !(await showConfirm(
         "Import main-folder data",
-        "Copy all saved main-folder data into these submitted folders as PDFs? You can download each file afterwards."
+        "Copy all saved main-folder data into these submitted folders as documents? You can download each file afterwards."
       ))
     ) {
       return;
@@ -127,7 +127,7 @@ export default function TeacherCourseFolderScreen() {
       showAlert(
         "Imported",
         result?.message ||
-          `Saved main-folder data was copied into the submitted folders as PDFs (${count} item(s)).`
+          `Saved main-folder data was copied into the submitted folders as documents (${count} item(s)).`
       );
       await loadOverview();
     } catch (error) {
@@ -232,7 +232,7 @@ export default function TeacherCourseFolderScreen() {
                 onClick={handleImportMainData}
                 className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-extrabold text-indigo-900 hover:bg-indigo-100 disabled:opacity-50"
               >
-                {publishing ? "Importing…" : "Import saved main-folder data as PDFs"}
+                {publishing ? "Importing…" : "Import saved main-folder data as docs"}
               </button>
             </div>
           ) : null}
@@ -267,10 +267,9 @@ export default function TeacherCourseFolderScreen() {
                   <p className="text-sm font-semibold text-gray-900">
                     {folderDisplayName(folder)}
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    {folder.fileCount} file(s)
-                    {folderLocked ? " · Locked" : ""}
-                  </p>
+                  {folderLocked ? (
+                    <p className="mt-0.5 text-xs text-gray-500">Locked</p>
+                  ) : null}
                 </div>
                 <span className="shrink-0 text-xl text-gray-300">›</span>
               </button>

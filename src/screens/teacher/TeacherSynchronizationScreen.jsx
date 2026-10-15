@@ -168,11 +168,11 @@ function MatrixTab({ data }) {
   }
 
   return (
-    <div className="overflow-x-auto px-4 py-4 sm:px-6 lg:px-8">
-      <table className="min-w-full border-collapse">
+    <div className="w-full max-w-full overflow-x-auto px-4 py-4 sm:px-6 lg:px-8">
+      <table className="min-w-max w-full border-collapse">
         <thead>
-          <tr>
-            <th className="w-48 px-4 py-2 text-left text-xs font-black uppercase text-gray-400">
+          <tr className="border-b border-gray-100 dark:border-[#1b2c2e]">
+            <th className="sticky left-0 z-10 w-44 min-w-[11rem] max-w-[16rem] bg-gray-50 px-3 py-2 text-left text-xs font-black uppercase text-gray-500 shadow-[2px_0_4px_rgba(0,0,0,0.05)] dark:bg-[#071113] dark:text-gray-400 sm:w-56 sm:px-4">
               Topic Name
             </th>
             {teachers.map((teacher) => (
@@ -183,7 +183,7 @@ function MatrixTab({ data }) {
         <tbody className="space-y-1">
           {matrix.map((row) => (
             <tr key={row.topicId} className="bg-white shadow-sm dark:bg-[#0c181a] dark:border-b dark:border-[#1b2c2e]">
-              <td className="max-w-xs px-4 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">
+              <td className="sticky left-0 z-10 w-44 min-w-[11rem] max-w-[16rem] bg-white px-3 py-3 text-sm font-bold text-gray-900 shadow-[2px_0_4px_rgba(0,0,0,0.05)] dark:bg-[#0c181a] dark:text-gray-100 sm:w-56 sm:px-4 sm:py-4">
                 {row.topicName}
               </td>
               {(row.statuses ?? []).map((status) => (
@@ -237,14 +237,14 @@ function CommonTab({ data }) {
         <span className="font-semibold text-gray-800 dark:text-gray-200">Common covered topics</span> are completed by{" "}
         <strong>2+ teachers/sections</strong>. Topics completed by <strong>all {teachers.length}</strong> show as “All”.
       </p>
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse">
+      <div className="w-full max-w-full overflow-x-auto">
+        <table className="min-w-max w-full border-collapse">
           <thead>
-            <tr>
-              <th className="w-48 px-4 py-2 text-left text-xs font-black uppercase text-gray-400">
+            <tr className="border-b border-gray-100 dark:border-[#1b2c2e]">
+              <th className="sticky left-0 z-10 w-44 min-w-[11rem] max-w-[16rem] bg-gray-50 px-3 py-2 text-left text-xs font-black uppercase text-gray-500 shadow-[2px_0_4px_rgba(0,0,0,0.05)] dark:bg-[#071113] dark:text-gray-400 sm:w-56 sm:px-4">
                 Topic Name
               </th>
-              <th className="w-28 px-2 py-2 text-center text-xs font-black uppercase text-gray-400">
+              <th className="w-24 min-w-[5rem] px-2 py-2 text-center text-xs font-black uppercase text-gray-400 sm:w-28">
                 Coverage
               </th>
               {teachers.map((teacher) => (
@@ -258,7 +258,7 @@ function CommonTab({ data }) {
               const allDone = total > 0 && done === total;
               return (
                 <tr key={row.topicId} className="bg-white shadow-sm dark:bg-[#0c181a] dark:border-b dark:border-[#1b2c2e]">
-                  <td className="max-w-xs px-4 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">{row.topicName}</td>
+                  <td className="sticky left-0 z-10 w-44 min-w-[11rem] max-w-[16rem] bg-white px-3 py-3 text-sm font-bold text-gray-900 shadow-[2px_0_4px_rgba(0,0,0,0.05)] dark:bg-[#0c181a] dark:text-gray-100 sm:w-56 sm:px-4 sm:py-4">{row.topicName}</td>
                   <td className="px-2 py-4 text-center align-middle">
                     <span
                       className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-black ${
@@ -305,7 +305,7 @@ function GapsTab({ data, currentOfferedCourseId }) {
   }
 
   return (
-    <div className="space-y-4 px-6 py-6">
+    <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-6">
       <p className="text-xs font-black uppercase text-gray-400">Your section is behind on these topics</p>
       {gaps.map((gap) => (
         <div key={gap.topicId} className="rounded-xl border border-red-200 bg-white p-5 shadow dark:border-red-900/40 dark:bg-[#0c181a]">

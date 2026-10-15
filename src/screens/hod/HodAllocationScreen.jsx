@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
-import { clearHodUploadAllocation, getHodUploadAllocation, saveHodUploadAllocation } from "../../api/hodUploadAllocationApi";
+import { getHodUploadAllocation, saveHodUploadAllocation } from "../../api/hodUploadAllocationApi";
 import { getOfferedCourses } from "../../api/offeredCoursesApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import { useHodProgram } from "../../context/HodProgramContext.jsx";
 import { UPLOAD_ALLOCATION_TYPES, EMPTY_UPLOAD_ALLOCATION_ROW } from "../../constants/uploadAllocationTypes";
 import theme from "../../styles/theme";
 import HodMintHeader from "../../components/HodMintHeader.jsx";
@@ -23,7 +24,9 @@ function normalizeOfferedCourse(raw) {
     courseCode: raw.courseCode ?? raw.CourseCode ?? "",
     sectionName: raw.sectionName ?? raw.SectionName ?? "",
     teacherName: raw.teacherName ?? raw.TeacherName ?? "",
+    programId: raw.programId ?? raw.ProgramId ?? null,
     programName: raw.programName ?? raw.ProgramName ?? "",
+    programCode: raw.programCode ?? raw.ProgramCode ?? "",
   };
 }
 
@@ -49,9 +52,11 @@ function buildRowsFromConfig(offeredCourses, config) {
 
 export default function HodAllocationScreen() {
   const { user } = useContext(AuthContext);
+  const { selectedProgramId, selectedProgram } = useHodProgram();
   const [offeredCourses, setOfferedCourses] = useState([]);
   const [rows, setRows] = useState({});
   const [savedRows, setSavedRows] = useState({});
+  const [otherProgramAllocations, setOtherProgramAllocations] = useState({});
   const [configured, setConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,18 +65,33 @@ export default function HodAllocationScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      if (!selectedProgramId) {
+        setOfferedCourses([]);
+        setRows({});
+        setSavedRows({});
+        setOtherProgramAllocations({});
+        setConfigured(false);
+        return;
+      }
       const [coursesRaw, apiConfig] = await Promise.all([
         getOfferedCourses(),
         getHodUploadAllocation().catch(() => ({ configured: false, allocations: {} })),
       ]);
+      const allCourses = (Array.isArray(coursesRaw) ? coursesRaw : []).map(normalizeOfferedCourse);
       const courses = sortOfferedCourses(
-        (Array.isArray(coursesRaw) ? coursesRaw : []).map(normalizeOfferedCourse)
+        allCourses.filter((c) => Number(c.programId) === Number(selectedProgramId))
       );
+      const programIds = new Set(courses.map((c) => String(c.offeredCourseId)));
       const config = apiConfig?.allocations
         ? apiConfig
         : { configured: false, allocations: {} };
+      const other = {};
+      for (const [id, row] of Object.entries(config.allocations || {})) {
+        if (!programIds.has(String(id))) other[id] = normalizeAllocationRow(row);
+      }
       const loadedRows = buildRowsFromConfig(courses, config);
       setOfferedCourses(courses);
+      setOtherProgramAllocations(other);
       setConfigured(Boolean(config?.configured) || countVisibleTicks(courses, config.allocations) > 0);
       setRows(loadedRows);
       setSavedRows(loadedRows);
@@ -80,7 +100,7 @@ export default function HodAllocationScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedProgramId]);
 
   useEffect(() => {
     loadData();
@@ -120,7 +140,7 @@ export default function HodAllocationScreen() {
       const hasManual = offeredCourses.some((course) =>
         rowHasAnyPermission(rows[String(course.offeredCourseId)])
       );
-      const allocations = hasManual
+      const programAllocations = hasManual
         ? Object.fromEntries(
             offeredCourses
               .map((course) => {
@@ -130,24 +150,28 @@ export default function HodAllocationScreen() {
               .filter(([id]) => id && id !== "undefined")
           )
         : buildSectionAAllocations(offeredCourses);
-      const allocatedCount = countVisibleTicks(offeredCourses, allocations);
+      // Keep other programs' allocations so save does not wipe them.
+      const allocations = { ...otherProgramAllocations, ...programAllocations };
+      const allocatedCount = countVisibleTicks(offeredCourses, programAllocations);
       const nextRows = buildRowsFromConfig(offeredCourses, {
         configured: allocatedCount > 0,
-        allocations,
+        allocations: programAllocations,
       });
       setConfigured(allocatedCount > 0);
       setRows(nextRows);
       setSavedRows(nextRows);
 
       await saveHodUploadAllocation({
-        configured: allocatedCount > 0,
+        configured:
+          allocatedCount > 0 ||
+          Object.values(otherProgramAllocations).some(rowHasAnyPermission),
         allocations,
       }, user?.userId ?? user?.UserId);
 
       showAlert(
         "Saved",
         hasManual
-          ? `Allocation saved for ${allocatedCount} section${allocatedCount === 1 ? "" : "s"}.`
+          ? `Allocation saved for ${allocatedCount} section${allocatedCount === 1 ? "" : "s"} in this program.`
           : `The first A section of each course was allocated (${allocatedCount} section${allocatedCount === 1 ? "" : "s"}).`
       );
     } catch (error) {
@@ -161,7 +185,9 @@ export default function HodAllocationScreen() {
     if (
       !(await showConfirm(
         "Remove allocation",
-        "Remove allocation from every course and section? Teachers will not be able to upload until you allocate again."
+        selectedProgram
+          ? `Remove allocation from all courses in ${selectedProgram.programCode || selectedProgram.programName}? Other programs stay unchanged.`
+          : "Remove allocation from every course in this program?"
       ))
     ) {
       return;
@@ -169,15 +195,20 @@ export default function HodAllocationScreen() {
 
     try {
       setRemoving(true);
-      const saved = await clearHodUploadAllocation();
+      const allocations = { ...otherProgramAllocations };
+      const hasOther = Object.values(allocations).some(rowHasAnyPermission);
+      await saveHodUploadAllocation(
+        { configured: hasOther, allocations },
+        user?.userId ?? user?.UserId
+      );
       const nextRows = buildRowsFromConfig(offeredCourses, {
         configured: false,
         allocations: {},
       });
-      setConfigured(Boolean(saved?.configured) && Object.values(saved.allocations || {}).some(rowHasAnyPermission));
+      setConfigured(false);
       setRows(nextRows);
       setSavedRows(nextRows);
-      showAlert("Removed", "Allocation removed from all courses.");
+      showAlert("Removed", "Allocation removed for this program.");
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -189,7 +220,11 @@ export default function HodAllocationScreen() {
     <div className="min-h-full bg-page">
       <HodMintHeader
         title="Allocation"
-        subtitle="Assign upload responsibilities."
+        subtitle={
+          selectedProgram
+            ? `Assign upload responsibilities for ${selectedProgram.programCode || selectedProgram.programName}.`
+            : "Select a program from the top bar to assign upload responsibilities."
+        }
         action={
           <div className="flex flex-wrap items-center gap-2">
             <button

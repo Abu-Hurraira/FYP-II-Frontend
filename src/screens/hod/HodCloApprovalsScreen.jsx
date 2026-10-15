@@ -544,20 +544,20 @@ export default function HodCloApprovalsScreen() {
 
       {detailsOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-4 backdrop-blur-xs"
           role="presentation"
           onClick={closeDetails}
         >
           <div
-            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-gray-900">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {detailsOpen.contentTypeName || detailsOpen.contentTypeCode || "Submission"}
             </h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
               {detailsOpen.courseTitle}
               {detailsOpen.submittedByName ? ` · ${detailsOpen.submittedByName}` : ""}
             </p>
@@ -574,7 +574,7 @@ export default function HodCloApprovalsScreen() {
             <div className="mt-5 flex justify-end">
               <button
                 type="button"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
+                className="min-h-[44px] rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 onClick={closeDetails}
               >
                 Close
@@ -586,41 +586,41 @@ export default function HodCloApprovalsScreen() {
 
       {rejectTarget ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-4 backdrop-blur-xs"
           role="presentation"
           onClick={closeRejectDialog}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-gray-900">Review</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Review</h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
               Write the reason so the teacher can see why {rejectTarget.courseTitle} was rejected.
             </p>
-            <label className="mt-4 block text-sm font-semibold text-gray-800">
+            <label className="mt-4 block text-sm font-semibold text-gray-800 dark:text-gray-200">
               Reason
               <textarea
-                className="mt-2 min-h-[100px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal"
+                className="mt-2 min-h-[100px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="Write why you are rejecting this…"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 autoFocus
               />
             </label>
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
+                className="min-h-[44px] rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 onClick={closeRejectDialog}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white"
+                className="min-h-[44px] rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
                 onClick={handleRejectSubmit}
                 disabled={Boolean(actionId)}
               >

@@ -65,6 +65,7 @@ function normalizeDashboardCourse(raw) {
     sectionName: raw.sectionName ?? raw.SectionName ?? "",
     courseTitle: raw.courseTitle ?? raw.CourseTitle ?? "",
     courseCode: raw.courseCode ?? raw.CourseCode ?? "",
+    programId: raw.programId ?? raw.ProgramId ?? null,
     programName: raw.programName ?? raw.ProgramName ?? "",
     programCode: raw.programCode ?? raw.ProgramCode ?? "",
     programCourseId: raw.programCourseId ?? raw.ProgramCourseId ?? null,
@@ -118,6 +119,7 @@ export async function getHodDashboardCoursesPage({
   search = "",
   lite = false,
   hodUserId,
+  programId,
 } = {}) {
   const params = new URLSearchParams({
     page: String(page),
@@ -126,6 +128,9 @@ export async function getHodDashboardCoursesPage({
   if (search?.trim()) params.set("search", search.trim());
   if (lite) params.set("lite", "true");
   if (hodUserId != null && hodUserId !== "") params.set("hodUserId", String(hodUserId));
+  if (programId != null && programId !== "" && Number(programId) > 0) {
+    params.set("programId", String(programId));
+  }
 
   const data = await request(`/HodDashboard/courses?${params.toString()}`, { timeoutMs: 12000 });
   const itemsRaw = Array.isArray(data) ? data : data?.items ?? data?.Items ?? [];
@@ -155,7 +160,12 @@ export async function getHodDashboardCoursesList() {
  * Client-side paginated fallback when the dashboard API is unavailable.
  * Still avoids loading progress for every course at once.
  */
-export async function getOfferedCoursesFallbackPage({ page = 1, pageSize = 12, search = "" } = {}) {
+export async function getOfferedCoursesFallbackPage({
+  page = 1,
+  pageSize = 12,
+  search = "",
+  programId,
+} = {}) {
   let offered = [];
   try {
     offered = asList(await getOfferedCourses());
@@ -165,8 +175,14 @@ export async function getOfferedCoursesFallbackPage({ page = 1, pageSize = 12, s
 
   if (offered.length === 0) {
     const sessions = asList(await getSessions().catch(() => []));
+    const scopedSessions =
+      programId != null && Number(programId) > 0
+        ? sessions.filter(
+            (s) => Number(s.programId ?? s.ProgramId) === Number(programId)
+          )
+        : sessions;
     const batches = await Promise.all(
-      sessions.map((session) =>
+      scopedSessions.map((session) =>
         getOfferedCoursesBySession(session.sessionId ?? session.SessionId).catch(() => [])
       )
     );
@@ -178,10 +194,14 @@ export async function getOfferedCoursesFallbackPage({ page = 1, pageSize = 12, s
   );
 
   const deduped = deduplicateHodCourses(list);
+  const scoped =
+    programId != null && Number(programId) > 0
+      ? deduped.filter((c) => Number(c.programId ?? c.ProgramId) === Number(programId))
+      : deduped;
   const q = search.trim().toLowerCase();
   const filtered = !q
-    ? deduped
-    : deduped.filter((c) =>
+    ? scoped
+    : scoped.filter((c) =>
         [c.teacherName, c.sectionName, c.courseTitle, c.courseCode, c.programName]
           .filter(Boolean)
           .join(" ")
@@ -202,12 +222,19 @@ export async function getOfferedCoursesFallbackPage({ page = 1, pageSize = 12, s
 }
 
 /** Submitted folders — single API call. Never falls back to the N+1 scan (that hung the UI). */
-export async function getHodSubmittedFolders(hodUserId) {
+export async function getHodSubmittedFolders(hodUserId, { programId } = {}) {
   if (hodUserId == null || hodUserId === "" || Number.isNaN(Number(hodUserId))) {
     return [];
   }
 
-  const data = await request(`/HodDashboard/${hodUserId}/submitted-folders`);
+  const params = new URLSearchParams();
+  if (programId != null && programId !== "" && Number(programId) > 0) {
+    params.set("programId", String(programId));
+  }
+  const qs = params.toString();
+  const data = await request(
+    `/HodDashboard/${hodUserId}/submitted-folders${qs ? `?${qs}` : ""}`
+  );
   const list = Array.isArray(data) ? data : data?.folders ?? data?.Folders ?? [];
   return list.map((item) => ({
     ...normalizeDashboardCourse({

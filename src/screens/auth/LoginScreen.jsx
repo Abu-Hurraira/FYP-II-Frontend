@@ -51,9 +51,23 @@ const LoginScreen = () => {
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
     const previousBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
+
+    const handleOverflow = () => {
+      if (window.innerWidth >= 1024) {
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+        window.scrollTo(0, 0);
+      } else {
+        document.documentElement.style.overflow = "";
+        document.body.style.overflow = "";
+      }
+    };
+
+    handleOverflow();
+    window.addEventListener("resize", handleOverflow);
+
     return () => {
+      window.removeEventListener("resize", handleOverflow);
       document.documentElement.style.overflow = previousHtmlOverflow;
       document.body.style.overflow = previousBodyOverflow;
     };
@@ -86,7 +100,7 @@ const LoginScreen = () => {
   };
 
   return (
-    <div className="login-canvas fixed inset-0 h-[100dvh] w-screen overflow-hidden bg-[#f0f2f5] font-sans">
+    <div className="login-canvas relative min-h-screen min-h-[100dvh] w-full overflow-x-hidden bg-[#f0f2f5] font-sans lg:fixed lg:inset-0 lg:h-[100dvh] lg:overflow-hidden">
       <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
         <ThemeToggle variant="login" />
       </div>
@@ -137,7 +151,7 @@ const LoginScreen = () => {
       <div className="login-orb pointer-events-none absolute -right-28 -top-28 z-0 h-80 w-80 rounded-full bg-[#e4e9e6]" />
       <div className="login-orb pointer-events-none absolute -bottom-32 right-[10%] z-0 h-96 w-96 rounded-full bg-[#e4e9e6]" />
 
-      <div className="relative z-10 flex h-full w-full">
+      <div className="relative z-10 flex min-h-screen min-h-[100dvh] w-full lg:h-full">
         <aside className="relative hidden h-full w-[42%] shrink-0 flex-col px-10 py-8 xl:px-14 xl:py-10 lg:flex">
           <img
             src={logoUrl}
@@ -175,8 +189,9 @@ const LoginScreen = () => {
           </div>
         </aside>
 
-        <main className="flex h-full min-w-0 flex-1 flex-col items-center justify-center px-4 sm:px-8">
-          <div className="w-full max-w-[480px] rounded-2xl bg-white px-9 py-10 shadow-[0_18px_50px_rgba(15,23,42,0.10)] sm:px-10 sm:py-11">
+        <main className="flex min-h-screen min-h-[100dvh] w-full min-w-0 flex-1 flex-col items-center px-4 py-8 sm:px-8 sm:py-10 lg:h-full lg:min-h-0 lg:justify-center lg:py-0">
+          <div className="my-auto flex w-full max-w-[480px] flex-col items-center">
+            <div className="w-full rounded-2xl bg-white px-6 py-8 shadow-[0_18px_50px_rgba(15,23,42,0.10)] sm:px-10 sm:py-11">
             <div className="mb-8 flex flex-col items-center text-center">
               <img
                 src={logoUrl}
@@ -252,7 +267,7 @@ const LoginScreen = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
                   <input
                     type="checkbox"
@@ -293,13 +308,14 @@ const LoginScreen = () => {
                 )}
               </button>
             </form>
-          </div>
+            </div>
 
-          <p className="mt-5 shrink-0 text-center text-[11px] leading-relaxed text-gray-400">
-            © 2025 Folder Management System. All rights reserved.
-            <br />
-            Version 1.0.0
-          </p>
+            <p className="mt-5 shrink-0 text-center text-[11px] leading-relaxed text-gray-400">
+              © 2025 Folder Management System. All rights reserved.
+              <br />
+              Version 1.0.0
+            </p>
+          </div>
         </main>
       </div>
     </div>

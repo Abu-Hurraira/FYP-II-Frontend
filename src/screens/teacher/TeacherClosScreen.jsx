@@ -457,23 +457,23 @@ export default function TeacherClosScreen() {
 
       {actionModalVisible && canManage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6"
           onClick={() => setActionModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 sm:p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900">CLOs</h2>
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">CLOs</h2>
             <button
               type="button"
               onClick={() => {
                 setActionModalVisible(false);
                 setUploadModalVisible(true);
               }}
-              className="mb-3 w-full rounded-lg py-3 font-black text-white"
+              className="mb-3 w-full min-h-[44px] rounded-lg py-3 font-black text-white transition hover:opacity-95"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Import CLOs from file
@@ -481,7 +481,7 @@ export default function TeacherClosScreen() {
             <button
               type="button"
               onClick={openNewForm}
-              className="w-full rounded-lg py-3 font-black text-white"
+              className="w-full min-h-[44px] rounded-lg py-3 font-black text-white transition hover:opacity-95"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Add New CLO
@@ -489,7 +489,7 @@ export default function TeacherClosScreen() {
             <button
               type="button"
               onClick={() => setActionModalVisible(false)}
-              className="mt-4 w-full font-bold text-gray-500"
+              className="mt-4 w-full min-h-[44px] font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               Cancel
             </button>
@@ -499,23 +499,23 @@ export default function TeacherClosScreen() {
 
       {formModalVisible && canManage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6"
           onClick={() => setFormModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 sm:p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               {editingItem ? "Edit CLO" : "New CLO"}
             </h2>
-            <label className="text-sm font-extrabold text-gray-700">
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">
               {editingItem ? "Edit CLO" : "Enter CLO"}
             </label>
             <textarea
-              className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3"
+              className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#07858c]"
               placeholder="e.g. Apply fundamental physics principles to engineering problems."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -523,7 +523,7 @@ export default function TeacherClosScreen() {
             <button
               type="button"
               onClick={handleSave}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white"
+              className="mt-4 w-full min-h-[44px] rounded-lg py-3 font-black text-white transition hover:opacity-95"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Save
@@ -531,7 +531,7 @@ export default function TeacherClosScreen() {
             <button
               type="button"
               onClick={() => setFormModalVisible(false)}
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 w-full min-h-[44px] font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               Cancel
             </button>
@@ -541,20 +541,20 @@ export default function TeacherClosScreen() {
 
       {uploadModalVisible && canManage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6"
           onClick={() => setUploadModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 sm:p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Import CLOs file</h2>
-            <p className="mb-3 text-xs text-gray-500">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Import CLOs file</h2>
+            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
               Imported rows are saved as drafts. Use Upload to send them for HOD approval.
             </p>
-            <label className="flex h-11 cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600">
+            <label className="flex h-11 min-h-[44px] cursor-pointer items-center rounded-lg bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/10 px-3 font-bold text-gray-600 dark:text-gray-300">
               <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               {selectedFile ? selectedFile.name : "Browse"}
             </label>
@@ -562,7 +562,7 @@ export default function TeacherClosScreen() {
               type="button"
               onClick={handleImport}
               disabled={uploading}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="mt-4 w-full min-h-[44px] rounded-lg py-3 font-black text-white disabled:opacity-60 transition hover:opacity-95"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               {uploading ? "…" : "Import"}
@@ -570,7 +570,7 @@ export default function TeacherClosScreen() {
             <button
               type="button"
               onClick={() => setUploadModalVisible(false)}
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 w-full min-h-[44px] font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               Cancel
             </button>

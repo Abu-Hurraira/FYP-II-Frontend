@@ -135,7 +135,22 @@ export default function TeacherAssessmentMarksScreen() {
   }, [sheet, draft, questions, assessmentTotal]);
 
   const setMark = (studentId, questionId, text) => {
-    setDraft((prev) => ({ ...prev, [`${studentId}|${questionId}`]: text.replace(/[^0-9.]/g, "") }));
+    const cleaned = text.replace(/[^0-9.]/g, "");
+    if (!cleaned) {
+      setDraft((prev) => ({ ...prev, [`${studentId}|${questionId}`]: "" }));
+      return;
+    }
+    const q = questions.find((x) => x.questionId === questionId);
+    const num = Number(cleaned);
+    if (q && q.maxMarks > 0 && !Number.isNaN(num) && num > q.maxMarks) {
+      setDraft((prev) => ({ ...prev, [`${studentId}|${questionId}`]: String(q.maxMarks) }));
+      showAlert(
+        "Maximum marks exceeded",
+        `Marks for ${q.questionNo} cannot exceed maximum ${q.maxMarks}. Automatically set to ${q.maxMarks}.`
+      );
+      return;
+    }
+    setDraft((prev) => ({ ...prev, [`${studentId}|${questionId}`]: cleaned }));
   };
 
   const handleSave = async () => {
@@ -147,6 +162,7 @@ export default function TeacherAssessmentMarksScreen() {
 
     const marks = [];
     for (const student of sheet.students || []) {
+      let studentSum = 0;
       for (const question of questions) {
         const raw = (draft[`${student.studentId}|${question.questionId}`] || "").trim();
         if (!raw) {
@@ -159,10 +175,19 @@ export default function TeacherAssessmentMarksScreen() {
           return;
         }
         if (value > question.maxMarks) {
-          showAlert("Invalid marks", `${student.aridNo} / ${question.questionNo} cannot exceed ${question.maxMarks}.`);
+          showAlert("Invalid marks", `${student.aridNo} / ${question.questionNo} cannot exceed maximum ${question.maxMarks}.`);
           return;
         }
+        studentSum += value;
         marks.push({ studentId: student.studentId, questionId: question.questionId, obtainedMarks: value });
+      }
+
+      if (assessmentTotal > 0 && studentSum > assessmentTotal + 0.01) {
+        showAlert(
+          "Invalid total marks",
+          `Total marks for student ${student.aridNo} (${studentSum}) cannot exceed assessment total (${assessmentTotal}).`
+        );
+        return;
       }
     }
 
@@ -218,44 +243,62 @@ export default function TeacherAssessmentMarksScreen() {
               </p>
             ) : null}
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
-              <table className="min-w-full table-fixed text-xs">
+            <div className="w-full max-w-full overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+              <table className="min-w-max w-full text-xs">
                 <thead className="bg-[#166534] text-white">
                   <tr>
-                    <th className="w-56 px-4 py-3 text-left align-middle font-black">Student</th>
+                    <th className="sticky left-0 z-20 w-44 min-w-[10.5rem] bg-[#166534] px-3 py-3 text-left align-middle font-black shadow-[2px_0_4px_rgba(0,0,0,0.15)] sm:w-56 sm:min-w-[14rem] sm:px-4">
+                      Student
+                    </th>
                     {questions.map((q) => (
-                      <th key={q.questionId} className="px-2 py-3 text-center align-middle font-black">
+                      <th key={q.questionId} className="w-20 min-w-[5rem] px-2 py-3 text-center align-middle font-black">
                         <div>{q.questionNo}</div>
                         <div className="font-semibold opacity-80">/ {q.maxMarks || "?"}</div>
                       </th>
                     ))}
-                    <th className="w-28 px-2 py-3 text-center align-middle font-black">Total</th>
-                    <th className="w-28 px-2 py-3 text-center align-middle font-black">%</th>
+                    <th className="w-20 min-w-[4.5rem] px-2 py-3 text-center align-middle font-black sm:w-28">Total</th>
+                    <th className="w-20 min-w-[4.5rem] px-2 py-3 text-center align-middle font-black sm:w-28">%</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(sheet.students || []).map((student) => {
                     const stats = rowStats[student.studentId] || {};
                     return (
-                      <tr key={student.studentId} className="border-t border-gray-100 dark:border-[#1b2c2e]">
-                        <td className="px-4 py-2 text-left align-middle">
-                          <div className="font-extrabold text-gray-900 dark:text-white">{student.fullName}</div>
-                          <div className="text-gray-500">{student.aridNo}</div>
+                      <tr key={student.studentId} className="border-t border-gray-100 hover:bg-gray-50/50 dark:border-[#1b2c2e] dark:hover:bg-[#0e2023]">
+                        <td className="sticky left-0 z-10 w-44 min-w-[10.5rem] bg-white px-3 py-2 text-left align-middle shadow-[2px_0_4px_rgba(0,0,0,0.06)] dark:bg-[#0c181a] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)] sm:w-56 sm:min-w-[14rem] sm:px-4">
+                          <div className="truncate font-extrabold text-gray-900 dark:text-white" title={student.fullName}>
+                            {student.fullName}
+                          </div>
+                          <div className="truncate text-gray-500 font-mono text-[11px]">{student.aridNo}</div>
                         </td>
-                        {questions.map((q) => (
-                          <td key={`${student.studentId}|${q.questionId}`} className="px-2 py-2 text-center align-middle">
-                            <input
-                              className="mx-auto block w-16 rounded-lg border border-gray-200 bg-white px-1 py-1.5 text-center font-bold dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
-                              value={draft[`${student.studentId}|${q.questionId}`] ?? ""}
-                              onChange={(e) => setMark(student.studentId, q.questionId, e.target.value)}
-                              placeholder="-"
-                            />
-                          </td>
-                        ))}
-                        <td className="px-2 py-2 text-center align-middle font-black text-emerald-800">
+                        {questions.map((q) => {
+                          const val = draft[`${student.studentId}|${q.questionId}`] ?? "";
+                          const numVal = Number(val);
+                          const isOver = val !== "" && !Number.isNaN(numVal) && q.maxMarks > 0 && numVal > q.maxMarks;
+                          return (
+                            <td key={`${student.studentId}|${q.questionId}`} className="px-2 py-2 text-center align-middle">
+                              <input
+                                type="number"
+                                min={0}
+                                max={q.maxMarks}
+                                step="0.5"
+                                className={`mx-auto block w-16 rounded-lg border px-1 py-2 text-center text-sm font-bold dark:bg-[#122427] dark:text-white ${
+                                  isOver
+                                    ? "border-rose-500 bg-rose-50 text-rose-700 ring-1 ring-rose-500"
+                                    : "border-gray-200 bg-white dark:border-[#1b2c2e]"
+                                }`}
+                                value={val}
+                                onChange={(e) => setMark(student.studentId, q.questionId, e.target.value)}
+                                placeholder="-"
+                                title={isOver ? `Marks exceed max (${q.maxMarks})` : undefined}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="px-2 py-2 text-center align-middle font-black text-emerald-800 dark:text-emerald-400">
                           {formatNumber(stats.total)}
                         </td>
-                        <td className="px-2 py-2 text-center align-middle font-black text-emerald-800">
+                        <td className="px-2 py-2 text-center align-middle font-black text-emerald-800 dark:text-emerald-400">
                           {stats.percentage == null ? "—" : `${formatNumber(stats.percentage)}%`}
                         </td>
                       </tr>

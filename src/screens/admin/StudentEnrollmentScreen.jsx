@@ -568,12 +568,12 @@ export default function StudentEnrollmentScreen() {
       </div>
 
       {addVisible ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setAddVisible(false)} role="presentation">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-center text-lg font-semibold">Enroll student</h2>
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setAddVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">Enroll student</h2>
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Section
-              <AppSelect className="mt-1 w-full" value={form.sectionId} onChange={(e) => pickSection(e.target.value)}>
+              <AppSelect className="mt-1 w-full min-h-[40px]" value={form.sectionId} onChange={(e) => pickSection(e.target.value)}>
                 <option value="">Select section</option>
                 {sections.map((item) => (
                   <option key={item.sectionId} value={item.sectionId}>
@@ -582,9 +582,9 @@ export default function StudentEnrollmentScreen() {
                 ))}
               </AppSelect>
             </label>
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Offered course
-              <AppSelect className="mt-1 w-full" value={form.offeredCourseId} onChange={(e) => pickOfferedCourse(e.target.value)}>
+              <AppSelect className="mt-1 w-full min-h-[40px]" value={form.offeredCourseId} onChange={(e) => pickOfferedCourse(e.target.value)}>
                 <option value="">Select course</option>
                 {offeringsForFormSection.map((item) => (
                   <option key={item.offeredCourseId} value={item.offeredCourseId}>
@@ -593,10 +593,10 @@ export default function StudentEnrollmentScreen() {
                 ))}
               </AppSelect>
             </label>
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Student
               <AppSelect
-                className="mt-1 w-full"
+                className="mt-1 w-full min-h-[40px]"
                 value={form.studentPick}
                 onChange={(e) => pickExistingOrNewStudent(e.target.value)}
                 disabled={!form.sectionId}
@@ -615,39 +615,39 @@ export default function StudentEnrollmentScreen() {
               </AppSelect>
             </label>
             {pickedAlreadyEnrolled ? (
-              <p className="mb-3 text-xs font-semibold text-amber-700">
+              <p className="mb-3 text-xs font-semibold text-amber-700 dark:text-amber-400">
                 This student is already enrolled in the selected course. Pick another course, or New student.
               </p>
             ) : form.sectionId && studentsInFormSection.length === 0 ? (
-              <p className="mb-3 text-xs text-gray-500">
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
                 No students in this section yet. Choose New student to type name and ARID.
               </p>
             ) : (
-              <p className="mb-3 text-xs text-gray-500">
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
                 Pick a section student, then a course. Use New student only if they are not in the section yet.
               </p>
             )}
             {pickedExistingStudent ? (
-              <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
-                <p className="text-sm font-bold text-gray-900">{studentNameOf(pickedExistingStudent)}</p>
-                <p className="mt-0.5 text-xs font-semibold text-gray-600">{studentAridOf(pickedExistingStudent)}</p>
+              <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 dark:border-[#1b2c2e] dark:bg-[#122427]">
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{studentNameOf(pickedExistingStudent)}</p>
+                <p className="mt-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">{studentAridOf(pickedExistingStudent)}</p>
                 {studentEmailOf(pickedExistingStudent) ? (
-                  <p className="mt-0.5 text-xs text-gray-500">{studentEmailOf(pickedExistingStudent)}</p>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{studentEmailOf(pickedExistingStudent)}</p>
                 ) : null}
               </div>
             ) : isNewStudent ? (
               <>
-                <input className="mb-3 w-full rounded-lg border px-3 py-2 placeholder:text-gray-400" placeholder="e.g. Ali Khan" value={form.fullName} onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))} />
-                <input className="mb-3 w-full rounded-lg border px-3 py-2 placeholder:text-gray-400" placeholder="e.g. 23-Arid-0000" value={form.aridNo} onChange={(e) => setForm((prev) => ({ ...prev, aridNo: e.target.value }))} />
-                <input className="mb-4 w-full rounded-lg border px-3 py-2 placeholder:text-gray-400" placeholder="e.g. ali@biit.edu.pk (optional)" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
+                <input className="mb-3 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" placeholder="e.g. Ali Khan" value={form.fullName} onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))} />
+                <input className="mb-3 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" placeholder="e.g. 23-Arid-0000" value={form.aridNo} onChange={(e) => setForm((prev) => ({ ...prev, aridNo: e.target.value }))} />
+                <input className="mb-4 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" placeholder="e.g. ali@biit.edu.pk (optional)" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
               </>
             ) : (
               <div className="mb-4" />
             )}
-            <button type="button" disabled={saving || pickedAlreadyEnrolled} onClick={saveAdd} className="w-full rounded-lg py-3 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" disabled={saving || pickedAlreadyEnrolled} onClick={saveAdd} className="min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.colors.primaryDark }}>
               {saving ? "Saving…" : pickedAlreadyEnrolled ? "Already enrolled" : "Enroll"}
             </button>
-            <button type="button" onClick={() => setAddVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setAddVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -655,15 +655,15 @@ export default function StudentEnrollmentScreen() {
       ) : null}
 
       {editVisible && editStudent ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setEditVisible(false)} role="presentation">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-center text-lg font-semibold">Student enrollments</h2>
-            <input className="mb-3 w-full rounded-lg border px-3 py-2 placeholder:text-gray-400" placeholder="e.g. Ali Khan" value={editForm.fullName} onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))} />
-            <input className="mb-3 w-full rounded-lg border px-3 py-2 placeholder:text-gray-400" placeholder="e.g. 23-Arid-0000" value={editForm.aridNo} onChange={(e) => setEditForm((prev) => ({ ...prev, aridNo: e.target.value }))} />
-            <input className="mb-3 w-full rounded-lg border px-3 py-2 placeholder:text-gray-400" placeholder="e.g. ali@biit.edu.pk (optional)" value={editForm.email} onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))} />
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setEditVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">Student enrollments</h2>
+            <input className="mb-3 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" placeholder="e.g. Ali Khan" value={editForm.fullName} onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))} />
+            <input className="mb-3 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" placeholder="e.g. 23-Arid-0000" value={editForm.aridNo} onChange={(e) => setEditForm((prev) => ({ ...prev, aridNo: e.target.value }))} />
+            <input className="mb-3 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" placeholder="e.g. ali@biit.edu.pk (optional)" value={editForm.email} onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))} />
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Section
-              <AppSelect className="mt-1 w-full" value={editForm.sectionId} onChange={(e) => setEditForm((prev) => ({ ...prev, sectionId: e.target.value }))}>
+              <AppSelect className="mt-1 w-full min-h-[40px]" value={editForm.sectionId} onChange={(e) => setEditForm((prev) => ({ ...prev, sectionId: e.target.value }))}>
                 {sections.map((item) => (
                   <option key={item.sectionId} value={item.sectionId}>
                     {item.sectionName}
@@ -671,32 +671,32 @@ export default function StudentEnrollmentScreen() {
                 ))}
               </AppSelect>
             </label>
-            <button type="button" disabled={saving} onClick={saveEdit} className="w-full rounded-lg py-2.5 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" disabled={saving} onClick={saveEdit} className="min-h-[44px] w-full rounded-xl py-2.5 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.colors.primaryDark }}>
               {saving ? "Saving…" : "Save student"}
             </button>
 
-            <p className="mt-5 text-xs font-extrabold uppercase tracking-wide text-gray-500">Enrolled courses</p>
+            <p className="mt-5 text-xs font-extrabold uppercase tracking-wide text-gray-500 dark:text-gray-400">Enrolled courses</p>
             <div className="mt-2 space-y-2">
               {(editStudent.enrollments ?? editStudent.Enrollments ?? []).map((link) => (
-                <div key={link.studentOfferedCourseId ?? link.StudentOfferedCourseId ?? link.offeredCourseId} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                <div key={link.studentOfferedCourseId ?? link.StudentOfferedCourseId ?? link.offeredCourseId} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 dark:border-[#1b2c2e] dark:bg-[#122427]">
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-900">{link.courseCode ?? link.CourseCode} · {link.courseTitle ?? link.CourseTitle}</p>
-                    <p className="text-xs text-gray-500">{link.teacherName ?? link.TeacherName}</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{link.courseCode ?? link.CourseCode} · {link.courseTitle ?? link.CourseTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{link.teacherName ?? link.TeacherName}</p>
                   </div>
-                  <button type="button" disabled={saving} onClick={() => handleRemoveEnrollment(link)} className="text-xs font-extrabold text-red-600">
+                  <button type="button" disabled={saving} onClick={() => handleRemoveEnrollment(link)} className="min-h-[36px] px-2 text-xs font-extrabold text-red-600 hover:text-red-700 dark:text-red-400">
                     Remove
                   </button>
                 </div>
               ))}
               {(editStudent.enrollments ?? editStudent.Enrollments ?? []).length === 0 ? (
-                <p className="text-xs text-gray-500">Not enrolled in any offered course yet.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Not enrolled in any offered course yet.</p>
               ) : null}
             </div>
 
-            <label className="mt-4 block text-xs font-extrabold text-gray-600">
+            <label className="mt-4 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Add offered course
               <AppSelect
-                className="mt-1 w-full"
+                className="mt-1 w-full min-h-[40px]"
                 value={addCourseId}
                 onChange={(e) => setAddCourseId(e.target.value)}
                 emptyLabel="No remaining courses for this section"
@@ -710,20 +710,20 @@ export default function StudentEnrollmentScreen() {
               </AppSelect>
             </label>
             {addableOfferings.length === 0 ? (
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 {offeringsForFormSection.length === 0
                   ? "No offered courses exist for this section yet. Add them under Programs → Session → Offered Courses."
                   : "This student is already enrolled in every offered course for this section. Remove one above if you need to change it."}
               </p>
             ) : (
-              <button type="button" disabled={saving} onClick={handleAddEnrollment} className="mt-2 w-full rounded-lg border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-extrabold text-emerald-800 disabled:opacity-60">
+              <button type="button" disabled={saving} onClick={handleAddEnrollment} className="mt-2 min-h-[44px] w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-extrabold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300">
                 Add enrollment
               </button>
             )}
-            <button type="button" disabled={saving} onClick={handleDeleteStudent} className="mt-3 w-full font-bold text-red-600">
+            <button type="button" disabled={saving} onClick={handleDeleteStudent} className="mt-3 min-h-[44px] w-full font-bold text-red-600 hover:text-red-700 dark:text-red-400">
               Delete student
             </button>
-            <button type="button" onClick={() => setEditVisible(false)} className="mt-2 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setEditVisible(false)} className="mt-2 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Close
             </button>
           </div>

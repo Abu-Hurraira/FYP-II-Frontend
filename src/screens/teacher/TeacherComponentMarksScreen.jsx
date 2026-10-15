@@ -107,6 +107,21 @@ export default function TeacherComponentMarksScreen() {
   }, [sheet, showAttendance, showLab, showProject]);
 
   const setCell = (studentId, key, value) => {
+    const col = columns.find((c) => c.key === key);
+    if (col && col.max != null && value !== "" && value != null) {
+      const num = Number(value);
+      if (!Number.isNaN(num) && num > col.max) {
+        showAlert(
+          "Maximum marks exceeded",
+          `${col.label} cannot exceed maximum marks (${col.max}). Automatically capped at ${col.max}.`
+        );
+        setDraft((prev) => ({
+          ...prev,
+          [studentId]: { ...(prev[studentId] || {}), [key]: String(col.max) },
+        }));
+        return;
+      }
+    }
     setDraft((prev) => ({
       ...prev,
       [studentId]: { ...(prev[studentId] || {}), [key]: value },
@@ -115,6 +130,24 @@ export default function TeacherComponentMarksScreen() {
 
   const handleSave = async () => {
     try {
+      // Validate that no value exceeds col.max
+      for (const [studentId, row] of Object.entries(draft)) {
+        for (const col of columns) {
+          const val = row[col.key];
+          if (val !== "" && val != null) {
+            const num = Number(val);
+            if (Number.isNaN(num) || num < 0) {
+              showAlert("Invalid marks", `Please enter a valid non-negative number for ${col.label}.`);
+              return;
+            }
+            if (col.max != null && num > col.max) {
+              showAlert("Marks exceed maximum", `${col.label} cannot exceed maximum ${col.max}.`);
+              return;
+            }
+          }
+        }
+      }
+
       setSaving(true);
       const extraCols = sheet?.extraColumns ?? sheet?.ExtraColumns ?? [];
       const entries = Object.entries(draft).map(([studentId, row]) => ({
@@ -225,20 +258,30 @@ export default function TeacherComponentMarksScreen() {
                       <td className="px-3 py-2 font-medium text-gray-900">
                         {s.fullName ?? s.FullName}
                       </td>
-                      {columns.map((col) => (
-                        <td key={col.key} className="px-3 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            max={col.max}
-                            step="0.01"
-                            placeholder="0"
-                            className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-sm placeholder:text-gray-400"
-                            value={row[col.key] ?? ""}
-                            onChange={(e) => setCell(id, col.key, e.target.value)}
-                          />
-                        </td>
-                      ))}
+                      {columns.map((col) => {
+                        const val = row[col.key] ?? "";
+                        const numVal = Number(val);
+                        const isOver = val !== "" && !Number.isNaN(numVal) && col.max != null && numVal > col.max;
+                        return (
+                          <td key={col.key} className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              max={col.max}
+                              step="0.01"
+                              placeholder="0"
+                              className={`w-24 rounded-lg border px-2 py-1.5 text-sm placeholder:text-gray-400 ${
+                                isOver
+                                  ? "border-rose-500 bg-rose-50 text-rose-700 ring-1 ring-rose-500 font-bold"
+                                  : "border-gray-200"
+                              }`}
+                              value={val}
+                              onChange={(e) => setCell(id, col.key, e.target.value)}
+                              title={isOver ? `Marks exceed max (${col.max})` : undefined}
+                            />
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })}

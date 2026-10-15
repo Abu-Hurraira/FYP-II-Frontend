@@ -235,50 +235,50 @@ export default function HodSessionDetailsScreen() {
 
       {sectionModalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setSectionModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-3 text-lg font-semibold text-gray-900">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">
               {editingSection ? "Edit Section" : "Create Section"}
             </h2>
-            <label className="text-sm font-extrabold">Section Name</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Section Name</label>
             <input
-              className="mb-3 mt-1 w-full rounded-lg border px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. BSCS-1A"
               value={sectionName}
               onChange={(e) => setSectionName(e.target.value)}
             />
-            <label className="text-sm font-extrabold">Semester</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Semester</label>
             <input
-              className="mb-3 mt-1 w-full rounded-lg border px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. 1 to 8"
               inputMode="numeric"
               value={semester}
               onChange={(e) => setSemester(e.target.value)}
             />
-            <label className="text-sm font-extrabold">Attendance sheet (optional)</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Attendance sheet (optional)</label>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
-              className="mb-1 mt-1 w-full text-sm"
+              className="mb-1 mt-1 w-full text-sm text-gray-600 dark:text-gray-300"
               onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)}
             />
             {(editingSection?.attendanceSheetPath || editingSection?.AttendanceSheetPath) && !attendanceFile ? (
-              <p className="mb-4 text-xs text-gray-500">A sheet is already on file. Choose a new file to replace it.</p>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">A sheet is already on file. Choose a new file to replace it.</p>
             ) : (
-              <p className="mb-4 text-xs text-gray-500">Upload Excel/CSV for this section’s roster attendance archive.</p>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">Upload Excel/CSV for this section’s roster attendance archive.</p>
             )}
             <button
               type="button"
               onClick={handleSaveSection}
               disabled={uploadingAttendance}
-              className="w-full rounded-lg py-3 font-black text-white disabled:opacity-50"
+              className="min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-50"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               {uploadingAttendance
@@ -290,7 +290,7 @@ export default function HodSessionDetailsScreen() {
             <button
               type="button"
               onClick={() => setSectionModalVisible(false)}
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
             >
               Cancel
             </button>

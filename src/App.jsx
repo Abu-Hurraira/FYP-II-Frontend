@@ -72,6 +72,8 @@ const HodSubmittedFolderDetailScreen = lazy(() => import("./screens/hod/HodSubmi
 const HodSubmittedFolderFilesScreen = lazy(() => import("./screens/hod/HodSubmittedFolderFilesScreen.jsx"));
 const GraderHomeScreen = lazy(() => import("./screens/grader/GraderHomeScreen.jsx"));
 const GraderCourseMenuScreen = lazy(() => import("./screens/grader/GraderCourseMenuScreen.jsx"));
+const GraderExamSamplesScreen = lazy(() => import("./screens/grader/GraderExamSamplesScreen.jsx"));
+const GraderExamMarksScreen = lazy(() => import("./screens/grader/GraderExamMarksScreen.jsx"));
 
 export const normalizeRole = (user) => {
   const rawRoleId =
@@ -260,8 +262,12 @@ const App = () => {
         <Route path="profile" element={<LazyPage><ProfileScreen /></LazyPage>} />
         <Route path="attendance" element={<LazyPage><TeacherAttendanceScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/menu" element={<LazyPage><GraderCourseMenuScreen /></LazyPage>} />
+        <Route path="course/:offeredCourseId/exam-samples" element={<LazyPage><GraderExamSamplesScreen /></LazyPage>} />
+        <Route path="course/:offeredCourseId/exam-marks" element={<LazyPage><GraderExamMarksScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/assignments" element={<LazyPage><TeacherAssignmentsScreen key="grader-assignments" /></LazyPage>} />
         <Route path="course/:offeredCourseId/quizzes" element={<LazyPage><TeacherAssignmentsScreen key="grader-quizzes" variant="Quiz" /></LazyPage>} />
+        <Route path="course/:offeredCourseId/mid-exams" element={<LazyPage><TeacherAssignmentsScreen key="grader-mid" variant="Mid" /></LazyPage>} />
+        <Route path="course/:offeredCourseId/final-exams" element={<LazyPage><TeacherAssignmentsScreen key="grader-final" variant="Final" /></LazyPage>} />
         <Route path="course/:offeredCourseId/component-marks" element={<LazyPage><TeacherComponentMarksScreen /></LazyPage>} />
         <Route path="course/:offeredCourseId/assessments/:assessmentId/marks" element={<LazyPage><TeacherAssessmentMarksScreen /></LazyPage>} />
       </Route>

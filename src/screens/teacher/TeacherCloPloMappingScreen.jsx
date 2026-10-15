@@ -387,17 +387,19 @@ export default function TeacherCloPloMappingScreen({ embedded = false }) {
             </p>
           </div>
         ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-card shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+        <div className="w-full max-w-full overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-card shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="min-w-max w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#15803d] text-white dark:bg-[#14482b]">
-                  <th className="py-3.5 px-4 text-xs font-black uppercase tracking-wider text-center">CLO</th>
+                  <th className="sticky left-0 z-20 w-24 min-w-[5.5rem] bg-[#15803d] py-3.5 px-3 text-center text-xs font-black uppercase tracking-wider shadow-[2px_0_4px_rgba(0,0,0,0.15)] sm:w-28 sm:px-4 dark:bg-[#14482b]">
+                    CLO
+                  </th>
                   {plos.map((plo) => (
                     <th
                       key={plo.ploId}
                       title={plo.ploDescription}
-                      className="py-3.5 px-4 text-xs font-black uppercase tracking-wider text-center"
+                      className="min-w-[4.75rem] px-2 py-3.5 text-center text-xs font-black uppercase tracking-wider sm:min-w-[5.5rem] sm:px-4"
                     >
                       {plo.ploCode}
                     </th>
@@ -412,15 +414,15 @@ export default function TeacherCloPloMappingScreen({ embedded = false }) {
                     key={clo.cloId}
                     className={
                       multi
-                        ? "bg-red-50/80 dark:bg-red-950/30"
+                        ? "bg-red-50 dark:bg-red-950/30"
                         : rIdx % 2 === 0
                           ? "bg-white dark:bg-[#0c181a]"
-                          : "bg-gray-50/50 dark:bg-[#091517]"
+                          : "bg-gray-50 dark:bg-[#091517]"
                     }
                   >
                     <td
                       title={clo.cloDescription}
-                      className="py-3.5 px-4 text-xs sm:text-sm font-extrabold text-[#15803d] dark:text-[#34d399] text-center"
+                      className="sticky left-0 z-10 w-24 min-w-[5.5rem] bg-inherit py-3.5 px-3 text-center text-xs font-extrabold text-[#15803d] shadow-[2px_0_4px_rgba(0,0,0,0.06)] dark:text-[#34d399] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)] sm:w-28 sm:px-4 sm:text-sm"
                     >
                       {clo.cloCode}
                       {multi ? (
@@ -430,7 +432,7 @@ export default function TeacherCloPloMappingScreen({ embedded = false }) {
                     {plos.map((plo) => {
                       const currentVal = matrixState[clo.cloId]?.[plo.ploId] ?? 0;
                       return (
-                        <td key={plo.ploId} className="py-2.5 px-2 text-center">
+                        <td key={plo.ploId} className="min-w-[4.75rem] py-2.5 px-2 text-center sm:min-w-[5.5rem]">
                           {canEdit ? (
                             <PercentInput
                               value={currentVal}
@@ -447,8 +449,8 @@ export default function TeacherCloPloMappingScreen({ embedded = false }) {
                   </tr>
                   );
                 })}
-                <tr className="bg-amber-50/70 border-t-2 border-amber-200/70 dark:bg-[#201d14] dark:border-amber-500/30">
-                  <td className="py-3.5 px-4 text-xs sm:text-sm font-black text-amber-900 dark:text-amber-300 text-center">
+                <tr className="bg-amber-50 border-t-2 border-amber-200 dark:bg-[#201d14] dark:border-amber-500/30">
+                  <td className="sticky left-0 z-10 w-24 min-w-[5.5rem] bg-amber-50 py-3.5 px-3 text-center text-xs font-black text-amber-900 shadow-[2px_0_4px_rgba(0,0,0,0.06)] dark:bg-[#201d14] dark:text-amber-300 sm:w-28 sm:px-4 sm:text-sm">
                     Total
                   </td>
                   {plos.map((plo) => {
@@ -457,7 +459,7 @@ export default function TeacherCloPloMappingScreen({ embedded = false }) {
                     return (
                       <td
                         key={plo.ploId}
-                        className={`py-3.5 px-4 text-xs sm:text-sm font-black text-center ${
+                        className={`min-w-[4.75rem] py-3.5 px-2 text-center text-xs font-black sm:min-w-[5.5rem] sm:px-4 sm:text-sm ${
                           isExceeded
                             ? "text-red-700 bg-red-100/90 dark:bg-red-950/60 dark:text-red-300 rounded-lg"
                             : "text-amber-900 dark:text-amber-300"

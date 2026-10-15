@@ -78,14 +78,14 @@ export function NotificationProvider({ children }) {
     <NotificationContext.Provider value={value}>
       {children}
 
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-[300] flex flex-col items-end gap-2 px-4 sm:px-6">
+      <div className="pointer-events-none fixed inset-x-0 top-4 z-[300] flex flex-col items-end gap-2 px-3 sm:px-6">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto max-w-md rounded-xl border px-4 py-3 shadow-lg ${
+            className={`pointer-events-auto w-full max-w-sm rounded-xl border px-4 py-3 shadow-lg sm:max-w-md ${
               t.variant === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-                : "border-red-200 bg-red-50 text-red-950"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-800/40 dark:bg-emerald-950/90 dark:text-emerald-100"
+                : "border-red-200 bg-red-50 text-red-950 dark:border-red-800/40 dark:bg-red-950/90 dark:text-red-100"
             }`}
             data-toast={t.variant}
             role="status"
@@ -98,31 +98,31 @@ export function NotificationProvider({ children }) {
 
       {confirmState ? (
         <div
-          className="fixed inset-0 z-[301] flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-[301] flex items-center justify-center bg-black/45 p-3 sm:p-4 backdrop-blur-xs"
           role="presentation"
           onClick={() => resolveConfirm(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6 dark:bg-[#0c181a] dark:text-white"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-gray-900">{confirmState.title}</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">{confirmState.title}</h2>
             {confirmState.message ? (
-              <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">{confirmState.message}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300">{confirmState.message}</p>
             ) : null}
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40"
+                className="min-h-[44px] rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-brand-muted/40 dark:border-gray-700 dark:text-gray-300"
                 onClick={() => resolveConfirm(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="app-btn-primary rounded-2xl px-4 py-2 text-sm"
+                className="app-btn-primary min-h-[44px] rounded-xl px-5 py-2.5 text-sm font-bold"
                 onClick={() => resolveConfirm(true)}
               >
                 OK

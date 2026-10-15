@@ -39,6 +39,52 @@ function isTopicFullyCovered(topic) {
   return children.every((child) => isTopicFullyCovered(child));
 }
 
+function collectLeafTopics(nodes, out = []) {
+  for (const node of nodes || []) {
+    const kids = node.children ?? [];
+    if (kids.length === 0) out.push(node);
+    else collectLeafTopics(kids, out);
+  }
+  return out;
+}
+
+function syncPrefKey(programCourseId) {
+  return `weeklyTopicSyncSections:v1:${programCourseId || "global"}`;
+}
+
+function readSyncPref(programCourseId) {
+  try {
+    const raw = localStorage.getItem(syncPrefKey(programCourseId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      skipModal: Boolean(parsed.skipModal),
+      siblingIds: Array.isArray(parsed.siblingIds)
+        ? parsed.siblingIds.map(Number).filter((id) => id > 0)
+        : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSyncPref(programCourseId, pref) {
+  try {
+    localStorage.setItem(syncPrefKey(programCourseId), JSON.stringify(pref));
+  } catch {
+    // ignore
+  }
+}
+
+function clearSyncPref(programCourseId) {
+  try {
+    localStorage.removeItem(syncPrefKey(programCourseId));
+  } catch {
+    // ignore
+  }
+}
+
 export default function WeeklyContentScreen() {
   const { user } = useContext(AuthContext);
   const { offeredCourseId: oc } = useParams();
@@ -74,8 +120,11 @@ export default function WeeklyContentScreen() {
   const [isSubmittingWeekly, setIsSubmittingWeekly] = useState(false);
   const [applyModal, setApplyModal] = useState(null);
   const [selectedSiblingIds, setSelectedSiblingIds] = useState([]);
+  const [rememberSyncChoice, setRememberSyncChoice] = useState(true);
   const [isApplyingTopic, setIsApplyingTopic] = useState(false);
   const [siblingSections, setSiblingSections] = useState([]);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState([]);
   const [loadSchemeModal, setLoadSchemeModal] = useState(false);
   const [loadSchemes, setLoadSchemes] = useState([]);
   const [loadSchemesLoading, setLoadSchemesLoading] = useState(false);
@@ -141,23 +190,46 @@ export default function WeeklyContentScreen() {
     loadData();
   }, [offeredCourseId]);
 
-  const applyTopicProgress = async (topic, isCompleted, alsoOfferedCourseIds = []) => {
+  const programCourseIdForPref = data?.programCourseId ?? data?.ProgramCourseId;
+
+  const validSiblingIds = useMemo(
+    () => siblingSections.map((s) => Number(s.offeredCourseId)).filter((id) => id > 0),
+    [siblingSections]
+  );
+
+  const applyTopicsProgress = async (topics, isCompleted, alsoOfferedCourseIds = [], { remember = false } = {}) => {
+    const list = (topics || []).filter(Boolean);
+    if (list.length === 0) return;
     try {
       setIsApplyingTopic(true);
       const extraIds = (alsoOfferedCourseIds || []).filter(
         (id) => Number(id) > 0 && Number(id) !== Number(offeredCourseId)
       );
-      const result = await updateTopicProgress(
-        offeredCourseId,
-        topic.topicId,
-        teacherUserId,
-        isCompleted,
-        extraIds
-      );
-      for (const extraId of extraIds) {
-        await updateTopicProgress(extraId, topic.topicId, teacherUserId, isCompleted, []);
+
+      if (remember) {
+        writeSyncPref(programCourseIdForPref, {
+          skipModal: true,
+          siblingIds: extraIds,
+        });
       }
-      setData(result);
+
+      let latest = null;
+      for (const topic of list) {
+        latest = await updateTopicProgress(
+          offeredCourseId,
+          topic.topicId,
+          teacherUserId,
+          isCompleted,
+          extraIds
+        );
+        for (const extraId of extraIds) {
+          await updateTopicProgress(extraId, topic.topicId, teacherUserId, isCompleted, []);
+        }
+      }
+      if (latest) setData(latest);
+      else await loadData();
+      setBulkSelectedIds([]);
+      setMultiSelectMode(false);
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
@@ -166,25 +238,69 @@ export default function WeeklyContentScreen() {
     }
   };
 
+  const openApplyModal = (topics, nextCompleted) => {
+    const pref = readSyncPref(programCourseIdForPref);
+    const preferred = (pref?.siblingIds || []).filter((id) => validSiblingIds.includes(id));
+    setSelectedSiblingIds(preferred.length > 0 ? preferred : validSiblingIds);
+    setRememberSyncChoice(true);
+    setApplyModal({ topics, nextCompleted });
+  };
+
   const handleToggleTopic = async (topic) => {
     const hasChildren = (topic.children?.length ?? 0) > 0;
+    // Parent topics follow their sub-topics: checkbox is display-only until all children are done.
     if (hasChildren) {
-      showAlert(
-        "Sub-topics pending",
-        "Complete all nested sub-topics before this topic can be marked covered."
-      );
+      if (isTopicFullyCovered(topic)) {
+        showAlert(
+          "Already complete",
+          "This topic is marked complete because all its sub-topics are done. Uncheck a sub-topic to change coverage."
+        );
+      } else {
+        showAlert(
+          "Sub-topics pending",
+          "Tick every sub-topic first — then this main topic will become complete automatically."
+        );
+      }
       return;
     }
     if (isApplyingTopic) return;
 
-    const nextCompleted = !topic.isCompleted;
-    if (siblingSections.length > 0) {
-      setSelectedSiblingIds(siblingSections.map((s) => Number(s.offeredCourseId)));
-      setApplyModal({ topic, nextCompleted });
+    // Multi-select: gather several leaf topics, then apply once.
+    if (multiSelectMode) {
+      const id = Number(topic.topicId);
+      setBulkSelectedIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
       return;
     }
 
-    await applyTopicProgress(topic, nextCompleted);
+    const nextCompleted = !topic.isCompleted;
+    if (siblingSections.length > 0) {
+      const pref = readSyncPref(programCourseIdForPref);
+      if (pref?.skipModal) {
+        const ids = (pref.siblingIds || []).filter((id) => validSiblingIds.includes(id));
+        await applyTopicsProgress([topic], nextCompleted, ids);
+        return;
+      }
+      openApplyModal([topic], nextCompleted);
+      return;
+    }
+
+    await applyTopicsProgress([topic], nextCompleted, []);
+  };
+
+  const startBulkApply = (nextCompleted) => {
+    const leaves = collectLeafTopics(data?.weeks ?? []);
+    const selected = leaves.filter((t) => bulkSelectedIds.includes(Number(t.topicId)));
+    if (selected.length === 0) {
+      showAlert("Select topics", "Tick one or more topics first.");
+      return;
+    }
+    if (siblingSections.length > 0) {
+      openApplyModal(selected, nextCompleted);
+      return;
+    }
+    applyTopicsProgress(selected, nextCompleted, []);
   };
 
   const siblingLabel = (section) => {
@@ -380,8 +496,9 @@ export default function WeeklyContentScreen() {
   const pickFile = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!f.name?.toLowerCase().endsWith(".xlsx")) {
-      showAlert("Invalid File", "Please select a .xlsx file.");
+    const name = f.name?.toLowerCase() || "";
+    if (!name.endsWith(".xlsx")) {
+      showAlert("Invalid File", "Please select a .xlsx Excel file.");
       e.target.value = "";
       return;
     }
@@ -433,7 +550,7 @@ export default function WeeklyContentScreen() {
 
   const handleUploadFile = async () => {
     if (!selectedFile) {
-      showAlert("File", "Please select a .xlsx file.");
+      showAlert("File", "Please select a .xlsx Excel file.");
       return;
     }
     if (!teacherUserId) {
@@ -442,12 +559,29 @@ export default function WeeklyContentScreen() {
     }
     try {
       const result = await uploadWeeklyContentFile(offeredCourseId, teacherUserId, selectedFile);
-      showAlert("Success", result.message || "Uploaded successfully.");
+      const created = result.createdTopics ?? result.CreatedTopics ?? 0;
+      const existing = result.existingTopics ?? result.ExistingTopics ?? 0;
+      const errors = result.errors ?? result.Errors ?? [];
+      const extra =
+        Array.isArray(errors) && errors.length > 0
+          ? `\n\n${errors.slice(0, 5).join("\n")}`
+          : "";
+      if (created <= 0 && existing <= 0) {
+        showAlert(
+          "No topics imported",
+          `${result.message || result.Message || "Nothing was saved."}${extra}`
+        );
+        return;
+      }
+      showAlert(
+        "Uploaded",
+        `${result.message || result.Message || "Uploaded successfully."}${extra}\n\nCreated: ${created} · Existing: ${existing}`
+      );
       setUploadModal(false);
       setSelectedFile(null);
-      loadData();
+      await loadData();
     } catch (error) {
-      showAlert("Error", error.message);
+      showAlert("Upload failed", error.message || "Could not upload this Excel file.");
     }
   };
 
@@ -527,26 +661,96 @@ export default function WeeklyContentScreen() {
             . Progress is tracked separately for your section.
           </p>
         )}
-        {siblingSections.length > 0 && (
-          <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            You also teach this subject in{" "}
-            <span className="font-semibold">
-              {siblingSections.map(siblingLabel).join(", ")}
-            </span>
-            . When you tick a topic, you can mark those sections from here — no need to open each one.
-          </p>
+        {(siblingSections.length > 0 || (data?.weeks?.length > 0)) && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {siblingSections.length > 0 ? (
+              <p>
+                You also teach this subject in{" "}
+                <span className="font-semibold">
+                  {siblingSections.map(siblingLabel).join(", ")}
+                </span>
+                . Select multiple topics, then mark them once for all chosen sections.
+              </p>
+            ) : (
+              <p>Select multiple topics and mark them complete/incomplete in one go.</p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMultiSelectMode((v) => !v);
+                  setBulkSelectedIds([]);
+                }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  multiSelectMode
+                    ? "bg-emerald-700 text-white"
+                    : "bg-white text-emerald-900 border border-emerald-300"
+                }`}
+              >
+                {multiSelectMode ? "Multi-select on" : "Select multiple topics"}
+              </button>
+              {siblingSections.length > 0 && readSyncPref(programCourseIdForPref)?.skipModal ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearSyncPref(programCourseIdForPref);
+                    showAlert("Reset", "Section choice will be asked again next time.");
+                  }}
+                  className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900"
+                >
+                  Reset saved sections
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {multiSelectMode && (
+          <div className="sticky top-14 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-brand/30 bg-white px-4 py-3 shadow-sm">
+            <p className="mr-auto text-sm font-semibold text-gray-800">
+              {bulkSelectedIds.length} topic{bulkSelectedIds.length === 1 ? "" : "s"} selected
+            </p>
+            <button
+              type="button"
+              disabled={isApplyingTopic || bulkSelectedIds.length === 0}
+              onClick={() => startBulkApply(true)}
+              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+            >
+              Mark complete
+            </button>
+            <button
+              type="button"
+              disabled={isApplyingTopic || bulkSelectedIds.length === 0}
+              onClick={() => startBulkApply(false)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 disabled:opacity-50"
+            >
+              Mark incomplete
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMultiSelectMode(false);
+                setBulkSelectedIds([]);
+              }}
+              className="rounded-lg px-3 py-2 text-xs font-bold text-gray-500"
+            >
+              Cancel
+            </button>
+          </div>
         )}
 
         {data?.weeks?.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            {data.weeks.map((week, index) => (
-              <TopicCard
-                key={week.topicId}
-                topic={week}
-                index={index}
+          <div className="space-y-4">
+            {groupTopicsByWeek(data.weeks).map((group) => (
+              <WeekGroup
+                key={`week-${group.weekNo}`}
+                weekNo={group.weekNo}
+                topics={group.topics}
                 canUpload={canUploadWeeklyContent}
                 onToggle={handleToggleTopic}
                 onAddSubTopic={openSubTopicModal}
+                multiSelectMode={multiSelectMode}
+                bulkSelectedIds={bulkSelectedIds}
               />
             ))}
           </div>
@@ -572,33 +776,33 @@ export default function WeeklyContentScreen() {
 
       {actionModal && (
         <ModalBackdrop onClose={() => setActionModal(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex-1 text-center text-xl font-extrabold">Weekly Content</h2>
-              <button type="button" className="text-2xl text-gray-500" onClick={() => setActionModal(false)}>
+              <h2 className="flex-1 text-center text-xl font-extrabold text-gray-900 dark:text-white">Weekly Content</h2>
+              <button type="button" className="text-2xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white p-1" onClick={() => setActionModal(false)}>
                 ×
               </button>
             </div>
             <button
               type="button"
-              className="app-btn-primary app-btn-primary-block mb-3 rounded-md py-3 font-bold"
+              className="app-btn-primary app-btn-primary-block mb-3 min-h-[44px] rounded-md py-3 font-bold"
               onClick={() => {
                 setActionModal(false);
                 setUploadModal(true);
               }}
             >
-              Upload from file
+              Upload from Excel
             </button>
             <button
               type="button"
-              className="app-btn-primary app-btn-primary-block mb-3 rounded-md py-3 font-bold"
+              className="app-btn-primary app-btn-primary-block mb-3 min-h-[44px] rounded-md py-3 font-bold"
               onClick={openLoadSchemeModal}
             >
               Load from Database
             </button>
             <button
               type="button"
-              className="app-btn-primary app-btn-primary-block rounded-md py-3 font-bold"
+              className="app-btn-primary app-btn-primary-block min-h-[44px] rounded-md py-3 font-bold"
               onClick={() => {
                 setActionModal(false);
                 setWeekNo("");
@@ -615,32 +819,32 @@ export default function WeeklyContentScreen() {
 
       {addModal && (
         <ModalBackdrop onClose={() => setAddModal(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex-1 text-center text-xl font-extrabold">Add Weekly Content</h2>
-              <button type="button" className="text-2xl text-gray-500" onClick={() => setAddModal(false)}>
+              <h2 className="flex-1 text-center text-xl font-extrabold text-gray-900 dark:text-white">Add Weekly Content</h2>
+              <button type="button" className="text-2xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white p-1" onClick={() => setAddModal(false)}>
                 ×
               </button>
             </div>
-            <p className="mb-4 text-center text-sm text-gray-500">
+            <p className="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
               Add a new weekly topic with optional CLO mapping.
             </p>
-            <label className="mt-2 block text-sm font-bold">Week Number</label>
+            <label className="mt-2 block text-sm font-bold text-gray-700 dark:text-gray-300">Week Number</label>
             <input
-              className="mb-3 mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-md border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#07858c]"
               value={weekNo}
               onChange={(e) => setWeekNo(e.target.value)}
               inputMode="numeric"
               placeholder="e.g., 13"
             />
-            <label className="mt-2 block text-sm font-bold">Topic</label>
+            <label className="mt-2 block text-sm font-bold text-gray-700 dark:text-gray-300">Topic</label>
             <input
-              className="mb-3 mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-md border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#07858c]"
               value={topicTitle}
               onChange={(e) => setTopicTitle(e.target.value)}
               placeholder="e.g., Graph Algorithms"
             />
-            <label className="mt-2 block text-sm font-bold">CLO Codes</label>
+            <label className="mt-2 block text-sm font-bold text-gray-700 dark:text-gray-300">CLO Codes</label>
             <CloCodePicker
               clos={uploadedCloOptions}
               selectedCodes={cloCodes}
@@ -649,7 +853,7 @@ export default function WeeklyContentScreen() {
             <button
               type="button"
               onClick={handleSaveTopic}
-              className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold"
+              className="app-btn-primary app-btn-primary-block min-h-[44px] rounded-md py-3 font-extrabold"
             >
               Save Topic
             </button>
@@ -664,12 +868,12 @@ export default function WeeklyContentScreen() {
             setSubTopicContext(null);
           }}
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex-1 text-center text-xl font-extrabold">Add sub-topic</h2>
+              <h2 className="flex-1 text-center text-xl font-extrabold text-gray-900 dark:text-white">Add sub-topic</h2>
               <button
                 type="button"
-                className="text-2xl text-gray-500"
+                className="text-2xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white p-1"
                 onClick={() => {
                   setSubTopicModal(false);
                   setSubTopicContext(null);
@@ -678,18 +882,18 @@ export default function WeeklyContentScreen() {
                 ×
               </button>
             </div>
-            <p className="mb-4 text-center text-sm text-gray-600">
-              Under <span className="font-bold">{subTopicContext.parentTitle}</span> · Week #
+            <p className="mb-4 text-center text-sm text-gray-600 dark:text-gray-400">
+              Under <span className="font-bold text-gray-900 dark:text-white">{subTopicContext.parentTitle}</span> · Week #
               {String(subTopicContext.weekNo).padStart(2, "0")}
             </p>
-            <label className="mt-2 block text-sm font-bold">Sub-topic title</label>
+            <label className="mt-2 block text-sm font-bold text-gray-700 dark:text-gray-300">Sub-topic title</label>
             <input
-              className="mb-3 mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-md border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#07858c]"
               value={subTopicTitle}
               onChange={(e) => setSubTopicTitle(e.target.value)}
               placeholder="e.g., Measurement errors"
             />
-            <label className="mt-2 block text-sm font-bold">CLO codes (optional)</label>
+            <label className="mt-2 block text-sm font-bold text-gray-700 dark:text-gray-300">CLO codes (optional)</label>
             <CloCodePicker
               clos={uploadedCloOptions}
               selectedCodes={subTopicCloCodes}
@@ -698,7 +902,7 @@ export default function WeeklyContentScreen() {
             <button
               type="button"
               onClick={handleSaveSubTopic}
-              className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold"
+              className="app-btn-primary app-btn-primary-block min-h-[44px] rounded-md py-3 font-extrabold"
             >
               Save sub-topic
             </button>
@@ -712,35 +916,67 @@ export default function WeeklyContentScreen() {
             if (!isApplyingTopic) setApplyModal(null);
           }}
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex-1 text-center text-xl font-extrabold">
+              <h2 className="flex-1 text-center text-xl font-extrabold text-gray-900 dark:text-white">
                 {applyModal.nextCompleted ? "Also mark other sections?" : "Also unmark other sections?"}
               </h2>
               <button
                 type="button"
-                className="text-2xl text-gray-500"
+                className="text-2xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white p-1"
                 disabled={isApplyingTopic}
                 onClick={() => setApplyModal(null)}
               >
                 ×
               </button>
             </div>
-            <p className="mb-3 text-center text-sm text-gray-600">
-              <span className="font-semibold text-gray-800">{applyModal.topic.topicTitle}</span>
+            <p className="mb-3 text-center text-sm text-gray-600 dark:text-gray-400">
+              <span className="font-semibold text-gray-800 dark:text-white">
+                {(applyModal.topics?.length ?? 0) > 1
+                  ? `${applyModal.topics.length} topics`
+                  : applyModal.topics?.[0]?.topicTitle || "Topic"}
+              </span>
               {" · "}
               {applyModal.nextCompleted ? "Mark complete" : "Mark incomplete"} on this section
-              {data?.sectionName ? ` (${data.sectionName})` : ""}. Tick any other sections where you
-              taught the same topic.
+              {data?.sectionName ? ` (${data.sectionName})` : ""}. Tick any other sections to update
+              together.
             </p>
-            <div className="mb-4 max-h-56 space-y-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
+            {(applyModal.topics?.length ?? 0) > 1 ? (
+              <ul className="mb-3 max-h-28 list-disc space-y-0.5 overflow-y-auto rounded-lg bg-gray-50 dark:bg-white/5 px-5 py-2 text-left text-xs text-gray-600 dark:text-gray-300">
+                {applyModal.topics.map((t) => (
+                  <li key={t.topicId}>{t.topicTitle}</li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Sections</p>
+              <div className="flex gap-2 text-xs font-bold">
+                <button
+                  type="button"
+                  disabled={isApplyingTopic}
+                  className="text-brand dark:text-brand-light"
+                  onClick={() => setSelectedSiblingIds(validSiblingIds)}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  disabled={isApplyingTopic}
+                  className="text-gray-500 dark:text-gray-400"
+                  onClick={() => setSelectedSiblingIds([])}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="mb-3 max-h-56 space-y-2 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3">
               {siblingSections.map((section) => {
                 const id = Number(section.offeredCourseId);
                 const checked = selectedSiblingIds.includes(id);
                 return (
                   <label
                     key={id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg bg-white dark:bg-[#132226] border border-transparent dark:border-white/5 px-3 py-2 text-sm font-semibold text-gray-800 dark:text-gray-200 shadow-sm"
                   >
                     <input
                       type="checkbox"
@@ -757,14 +993,29 @@ export default function WeeklyContentScreen() {
                 );
               })}
             </div>
+            <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={rememberSyncChoice}
+                disabled={isApplyingTopic}
+                onChange={(e) => setRememberSyncChoice(e.target.checked)}
+              />
+              <span>Remember this — next time apply without asking again.</span>
+            </label>
             <div className="space-y-2">
               <button
                 type="button"
                 disabled={isApplyingTopic}
                 onClick={() =>
-                  applyTopicProgress(applyModal.topic, applyModal.nextCompleted, selectedSiblingIds)
+                  applyTopicsProgress(
+                    applyModal.topics,
+                    applyModal.nextCompleted,
+                    selectedSiblingIds,
+                    { remember: rememberSyncChoice }
+                  )
                 }
-                className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold disabled:opacity-50"
+                className="app-btn-primary app-btn-primary-block min-h-[44px] rounded-md py-3 font-extrabold disabled:opacity-50"
               >
                 {isApplyingTopic
                   ? "Saving…"
@@ -775,8 +1026,12 @@ export default function WeeklyContentScreen() {
               <button
                 type="button"
                 disabled={isApplyingTopic}
-                onClick={() => applyTopicProgress(applyModal.topic, applyModal.nextCompleted, [])}
-                className="w-full rounded-md border border-gray-200 bg-white py-3 text-sm font-extrabold text-gray-700 disabled:opacity-50"
+                onClick={() =>
+                  applyTopicsProgress(applyModal.topics, applyModal.nextCompleted, [], {
+                    remember: false,
+                  })
+                }
+                className="w-full min-h-[44px] rounded-md border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 py-3 text-sm font-extrabold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-50"
               >
                 This section only
               </button>
@@ -787,23 +1042,28 @@ export default function WeeklyContentScreen() {
 
       {uploadModal && (
         <ModalBackdrop onClose={() => setUploadModal(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex-1 text-center text-xl font-extrabold">Upload</h2>
-              <button type="button" className="text-2xl text-gray-500" onClick={() => setUploadModal(false)}>
+              <h2 className="flex-1 text-center text-xl font-extrabold text-gray-900 dark:text-white">Upload</h2>
+              <button type="button" className="text-2xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white p-1" onClick={() => setUploadModal(false)}>
                 ×
               </button>
             </div>
-            <label className="text-sm font-bold">Upload weekly content file</label>
-            <label className="mt-2 flex cursor-pointer items-center justify-between rounded-md bg-gray-100 px-3 py-3">
-              <span className="truncate text-gray-600">{selectedFile?.name || "Select .xlsx file"}</span>
-              <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
-              <span>⇧</span>
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Upload weekly content Excel</label>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Excel (.xlsx) with WeekNo and TopicPath columns. Existing topics stay; new ones are added.
+            </p>
+            <label className="mt-2 flex min-h-[44px] cursor-pointer items-center justify-between rounded-md bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/10 px-3 py-3">
+              <span className="truncate text-gray-600 dark:text-gray-300">
+                {selectedFile?.name || "Select .xlsx file"}
+              </span>
+              <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={pickFile} />
+              <span className="text-gray-500 dark:text-gray-400">⇧</span>
             </label>
             <button
               type="button"
               onClick={handleUploadFile}
-              className="mt-4 w-full rounded-md bg-slate-500 py-3 font-extrabold text-white"
+              className="mt-4 w-full min-h-[44px] rounded-md bg-slate-500 py-3 font-extrabold text-white transition hover:bg-slate-600"
             >
               Upload
             </button>
@@ -817,14 +1077,14 @@ export default function WeeklyContentScreen() {
             if (!isApplyingLoadScheme) closeLoadSchemeModal();
           }}
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0c181a] border border-transparent dark:border-white/10 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex-1 text-center text-xl font-extrabold">
+              <h2 className="flex-1 text-center text-xl font-extrabold text-gray-900 dark:text-white">
                 {selectedLoadScheme ? "Select topics" : "Load from previous scheme"}
               </h2>
               <button
                 type="button"
-                className="text-2xl text-gray-500"
+                className="text-2xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white p-1"
                 disabled={isApplyingLoadScheme}
                 onClick={closeLoadSchemeModal}
               >
@@ -834,7 +1094,7 @@ export default function WeeklyContentScreen() {
 
             {!selectedLoadScheme ? (
               <>
-                <p className="mb-3 text-center text-sm text-gray-500">
+                <p className="mb-3 text-center text-sm text-gray-500 dark:text-gray-400">
                   Choose a previous scheme of study to copy weekly topics from.
                 </p>
                 {loadSchemesLoading ? (
@@ -842,7 +1102,7 @@ export default function WeeklyContentScreen() {
                     <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
                   </div>
                 ) : loadSchemes.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-500">
+                  <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                     No previous schemes with weekly topics were found for this subject.
                   </p>
                 ) : (
@@ -858,11 +1118,11 @@ export default function WeeklyContentScreen() {
                         <button
                           key={sid}
                           type="button"
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:border-brand hover:bg-brand-muted/20"
+                          className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3 text-left hover:border-brand hover:bg-brand-muted/20"
                           onClick={() => handleSelectLoadScheme(scheme)}
                         >
-                          <p className="text-sm font-bold text-gray-900">{label}</p>
-                          <p className="mt-0.5 text-xs text-gray-500">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">{label}</p>
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                             {year ? `${year} · ` : ""}
                             {weekCount != null ? `${weekCount} week${weekCount === 1 ? "" : "s"}` : ""}
                             {topicCount != null
@@ -877,8 +1137,8 @@ export default function WeeklyContentScreen() {
               </>
             ) : (
               <>
-                <p className="mb-3 text-center text-sm text-gray-600">
-                  <span className="font-semibold text-gray-800">
+                <p className="mb-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                  <span className="font-semibold text-gray-800 dark:text-white">
                     {selectedLoadScheme.schemeLabel ??
                       selectedLoadScheme.SchemeLabel}
                   </span>
@@ -902,11 +1162,11 @@ export default function WeeklyContentScreen() {
                     <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />
                   </div>
                 ) : loadTopics.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-500">
+                  <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                     No root topics found in this scheme.
                   </p>
                 ) : (
-                  <div className="mb-4 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="mb-4 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3">
                     {loadTopics.map((topic) => {
                       const tid = Number(topic.topicId ?? topic.TopicId);
                       const weekNo = topic.weekNo ?? topic.WeekNo;
@@ -918,7 +1178,7 @@ export default function WeeklyContentScreen() {
                       return (
                         <label
                           key={tid}
-                          className={`flex cursor-pointer items-start gap-3 rounded-lg bg-white px-3 py-2 text-sm shadow-sm ${
+                          className={`flex cursor-pointer items-start gap-3 rounded-lg bg-white dark:bg-[#132226] border border-transparent dark:border-white/5 px-3 py-2 text-sm shadow-sm ${
                             already ? "opacity-70" : ""
                           }`}
                         >
@@ -930,7 +1190,7 @@ export default function WeeklyContentScreen() {
                             onChange={() => toggleTopicSelection(tid)}
                           />
                           <span className="min-w-0 flex-1">
-                            <span className="font-semibold text-gray-900">
+                            <span className="font-semibold text-gray-900 dark:text-white">
                               Week{" "}
                               {weekNo != null
                                 ? String(weekNo).padStart(2, "0")
@@ -938,7 +1198,7 @@ export default function WeeklyContentScreen() {
                               — {title}
                             </span>
                             {already ? (
-                              <span className="mt-0.5 block text-xs text-amber-700">
+                              <span className="mt-0.5 block text-xs text-amber-700 dark:text-amber-400">
                                 Already in current outline
                               </span>
                             ) : null}
@@ -956,7 +1216,7 @@ export default function WeeklyContentScreen() {
                     selectedTopicIds.length === 0
                   }
                   onClick={handleApplyLoadScheme}
-                  className="app-btn-primary app-btn-primary-block rounded-md py-3 font-extrabold disabled:opacity-50"
+                  className="app-btn-primary app-btn-primary-block min-h-[44px] rounded-md py-3 font-extrabold disabled:opacity-50"
                 >
                   {isApplyingLoadScheme
                     ? "Applying…"
@@ -1025,11 +1285,15 @@ function CloCodePicker({ clos = [], selectedCodes = [], onChange }) {
 function ModalBackdrop({ children, onClose }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4"
       onClick={onClose}
       role="presentation"
     >
-      <div onClick={(e) => e.stopPropagation()} role="presentation">
+      <div
+        className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        role="presentation"
+      >
         {children}
       </div>
     </div>
@@ -1077,28 +1341,200 @@ function getTopicCoverageDetails(topic) {
   return { status: "pending", label: "Not complete", doneCount, totalCount };
 }
 
-function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic }) {
+function groupTopicsByWeek(topics = []) {
+  const map = new Map();
+  for (const topic of topics) {
+    const weekNo = topic.weekNo != null ? Number(topic.weekNo) : 0;
+    if (!map.has(weekNo)) map.set(weekNo, []);
+    map.get(weekNo).push(topic);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([weekNo, items]) => ({ weekNo, topics: items }));
+}
+
+function getWeekGroupCoverage(topics = []) {
+  let doneCount = 0;
+  let totalCount = 0;
+  for (const topic of topics) {
+    const details = getTopicCoverageDetails(topic);
+    doneCount += details.doneCount;
+    totalCount += details.totalCount;
+  }
+  if (totalCount === 0) {
+    return { status: "pending", label: "Not complete", doneCount: 0, totalCount: 0 };
+  }
+  if (doneCount === totalCount) {
+    return { status: "complete", label: "Complete", doneCount, totalCount };
+  }
+  if (doneCount > 0) {
+    return {
+      status: "partial",
+      label: `Partial (${doneCount}/${totalCount})`,
+      doneCount,
+      totalCount,
+    };
+  }
+  return { status: "pending", label: "Not complete", doneCount, totalCount };
+}
+
+function TopicCompleteCheckbox({
+  topic,
+  onToggle,
+  className = "",
+  multiSelectMode = false,
+  bulkSelected = false,
+}) {
+  const covered = isTopicFullyCovered(topic);
+  const checked = multiSelectMode ? bulkSelected : covered;
+  return (
+    <button
+      type="button"
+      className={`shrink-0 ${className}`.trim()}
+      onClick={() => onToggle(topic)}
+      aria-label={
+        multiSelectMode
+          ? bulkSelected
+            ? "Deselect topic"
+            : "Select topic"
+          : covered
+            ? "Mark incomplete"
+            : "Mark complete"
+      }
+    >
+      <span
+        className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
+          checked
+            ? multiSelectMode
+              ? "border-brand bg-brand text-white"
+              : "border-emerald-600 bg-emerald-600 text-white"
+            : "border-gray-300 bg-white text-transparent"
+        }`}
+      >
+        ✓
+      </span>
+    </button>
+  );
+}
+
+/** One Week header, then all topics for that week (no repeated "Week 01 —" on every row). */
+function WeekGroup({
+  weekNo,
+  topics,
+  canUpload = false,
+  onToggle,
+  onAddSubTopic,
+  multiSelectMode = false,
+  bulkSelectedIds = [],
+}) {
   const [expanded, setExpanded] = useState(false);
-  const weekNo = topic.weekNo != null ? Number(topic.weekNo) : index + 1;
+  const coverage = getWeekGroupCoverage(topics);
+  const label = weekNo > 0 ? `Week ${String(weekNo).padStart(2, "0")}` : "Other topics";
+  const headerTone =
+    coverage.status === "complete"
+      ? "border-emerald-200 bg-emerald-50"
+      : coverage.status === "partial"
+        ? "border-amber-200 bg-amber-50"
+        : "border-gray-200 bg-slate-50";
+  const statusTone =
+    coverage.status === "complete"
+      ? "text-emerald-700"
+      : coverage.status === "partial"
+        ? "text-amber-700"
+        : "text-gray-500";
+
+  return (
+    <div
+      className={`overflow-hidden rounded-xl border bg-white ${
+        coverage.status === "complete"
+          ? "border-emerald-200"
+          : coverage.status === "partial"
+            ? "border-amber-200"
+            : "border-gray-200"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className={`flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left ${headerTone}`}
+      >
+        <div>
+          <p className="text-sm font-extrabold text-gray-900">{label}</p>
+          <p className={`mt-0.5 text-xs font-semibold ${statusTone}`}>
+            {topics.length} topic{topics.length === 1 ? "" : "s"} · {coverage.label}
+          </p>
+        </div>
+        <span className={`inline-block text-gray-400 transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
+      </button>
+
+      {expanded ? (
+        <div>
+          {topics.map((topic) => (
+            <TopicCard
+              key={topic.topicId}
+              topic={topic}
+              weekNo={weekNo > 0 ? weekNo : Number(topic.weekNo) || 1}
+              canUpload={canUpload}
+              onToggle={onToggle}
+              onAddSubTopic={onAddSubTopic}
+              multiSelectMode={multiSelectMode}
+              bulkSelectedIds={bulkSelectedIds}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TopicCard({
+  topic,
+  weekNo,
+  canUpload = false,
+  onToggle,
+  onAddSubTopic,
+  multiSelectMode = false,
+  bulkSelectedIds = [],
+}) {
+  const [expanded, setExpanded] = useState(false);
   const hasChildren = (topic.children?.length ?? 0) > 0;
   const subTopicCount = topic.children?.length ?? 0;
   const coverage = getTopicCoverageDetails(topic);
-  const rowTone =
-    subTopicCount === 0 || coverage.status === "pending"
-      ? "bg-white"
-      : coverage.status === "complete"
-        ? "bg-emerald-50"
-        : "bg-yellow-50";
+  const bulkSelected = bulkSelectedIds.includes(Number(topic.topicId));
+  const rowTone = multiSelectMode && bulkSelected
+    ? "bg-brand/5"
+    : coverage.status === "complete"
+      ? "bg-emerald-50"
+      : coverage.status === "partial"
+        ? "bg-yellow-50"
+        : "bg-white";
 
   return (
     <div className={`border-b border-gray-200 last:border-b-0 ${rowTone}`}>
       <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
-        <button type="button" onClick={() => setExpanded((v) => !v)} className="min-w-0 flex-1 text-left">
-          <p className="text-sm font-semibold text-gray-900">
-            Week {String(weekNo).padStart(2, "0")} — {topic.topicTitle}
-          </p>
+        <TopicCompleteCheckbox
+          topic={topic}
+          onToggle={onToggle}
+          multiSelectMode={multiSelectMode && !hasChildren}
+          bulkSelected={bulkSelected}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (hasChildren) setExpanded((v) => !v);
+            else onToggle(topic);
+          }}
+          className="min-w-0 flex-1 text-left"
+        >
+          <p className="text-sm font-semibold text-gray-900">{topic.topicTitle}</p>
           <p className="mt-0.5 text-xs text-gray-500">
-            {subTopicCount} sub-topic{subTopicCount === 1 ? "" : "s"} · {coverage.label}
+            {hasChildren
+              ? `${subTopicCount} sub-topic${subTopicCount === 1 ? "" : "s"} · ${coverage.label}`
+              : multiSelectMode
+                ? bulkSelected
+                  ? "Selected"
+                  : "Tap to select"
+                : coverage.label}
           </p>
         </button>
 
@@ -1112,22 +1548,27 @@ function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic })
               Add sub-topic
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="px-1 text-gray-400 hover:text-gray-700"
-            aria-expanded={expanded}
-            aria-label={expanded ? "Collapse week" : "Expand week"}
-          >
-            <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
-          </button>
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="px-1 text-gray-400 hover:text-gray-700"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Collapse topic" : "Expand topic"}
+            >
+              <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {expanded ? (
-        <div id={`week-children-${topic.topicId}`} className="border-t border-gray-100 bg-gray-50/60">
-          {hasChildren ? (
-            topic.children.map((child) => (
+      {expanded && hasChildren ? (
+        <div
+          id={`topic-children-${topic.topicId}`}
+          className="border-t border-gray-100 bg-gray-50/60 pl-6 sm:pl-8"
+        >
+          <div className="ml-2 border-l-2 border-emerald-200/80">
+            {topic.children.map((child) => (
               <TopicNode
                 key={child.topicId}
                 topic={child}
@@ -1136,47 +1577,46 @@ function TopicCard({ topic, index, canUpload = false, onToggle, onAddSubTopic })
                 canUpload={canUpload}
                 onToggle={onToggle}
                 onAddSubTopic={onAddSubTopic}
+                multiSelectMode={multiSelectMode}
+                bulkSelectedIds={bulkSelectedIds}
               />
-            ))
-          ) : (
-            <p className="px-4 py-3 text-sm text-gray-500">
-              {canUpload ? "No sub-topics yet. Use Add sub-topic to add one." : "No sub-topics for this week yet."}
-            </p>
-          )}
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
   );
 }
 
-function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSubTopic }) {
+function TopicNode({
+  topic,
+  level,
+  weekNo,
+  canUpload = false,
+  onToggle,
+  onAddSubTopic,
+  multiSelectMode = false,
+  bulkSelectedIds = [],
+}) {
   const [expanded, setExpanded] = useState(false);
   const hasChildren = (topic.children?.length ?? 0) > 0;
-  const fullyCovered = isTopicFullyCovered(topic);
-  const pad = 16 + level * 18;
+  const pad = 20 + level * 22;
+  const bulkSelected = bulkSelectedIds.includes(Number(topic.topicId));
 
   return (
     <div>
       <div
-        className="flex items-center gap-3 border-b border-gray-100 py-2.5 pr-4 last:border-b-0"
+        className={`flex items-center gap-3 border-b border-gray-100/80 py-2.5 pr-4 last:border-b-0 ${
+          multiSelectMode && bulkSelected ? "bg-brand/5" : ""
+        }`}
         style={{ paddingLeft: pad }}
       >
-        <button
-          type="button"
-          className="shrink-0"
-          onClick={() => onToggle(topic)}
-          aria-label={fullyCovered ? "Mark incomplete" : "Mark complete"}
-        >
-          <span
-            className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
-              fullyCovered
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-gray-300 bg-white text-transparent"
-            }`}
-          >
-            ✓
-          </span>
-        </button>
+        <TopicCompleteCheckbox
+          topic={topic}
+          onToggle={onToggle}
+          multiSelectMode={multiSelectMode && !hasChildren}
+          bulkSelected={bulkSelected}
+        />
 
         <button
           type="button"
@@ -1216,7 +1656,7 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
       </div>
 
       {hasChildren && expanded ? (
-        <div id={`topic-children-${topic.topicId}`}>
+        <div id={`topic-children-${topic.topicId}`} className="border-l-2 border-emerald-200/70 ml-5">
           {topic.children.map((child) => (
             <TopicNode
               key={child.topicId}
@@ -1226,6 +1666,8 @@ function TopicNode({ topic, level, weekNo, canUpload = false, onToggle, onAddSub
               canUpload={canUpload}
               onToggle={onToggle}
               onAddSubTopic={onAddSubTopic}
+              multiSelectMode={multiSelectMode}
+              bulkSelectedIds={bulkSelectedIds}
             />
           ))}
         </div>

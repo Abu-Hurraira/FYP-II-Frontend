@@ -610,44 +610,34 @@ export async function uploadWeeklyContentFile(offeredCourseId, teacherUserId, fi
   return await request(`/TeacherWeeklyContent/${offeredCourseId}/upload`, {
     method: "POST",
     body: formData,
-    timeoutMs: 60000,
+    timeoutMs: 90000,
   });
 }
 
-export async function getTeacherSubmissionCourses(teacherUserId) {
-  return await request(`/TeacherSubmission/teacher/${teacherUserId}/courses`);
+export async function getCourseFolderOverview(offeredCourseId) {
+  return await request(`/TeacherSubmission/offered-course/${offeredCourseId}`);
 }
 
-/** Attach folder lock + HOD review fields from each course overview. */
-export async function enrichCoursesWithFolderReview(courses = [], { concurrency = 4 } = {}) {
-  const list = Array.isArray(courses) ? [...courses] : [];
-  if (!list.length) return [];
+export async function enrichCoursesWithFolderReview(courses, concurrency = 4) {
+  const list = [...(courses || [])];
+  if (list.length === 0) return list;
 
   let nextIndex = 0;
-
   const runWorker = async () => {
     while (nextIndex < list.length) {
       const index = nextIndex;
       nextIndex += 1;
       const course = list[index];
-      const offeredCourseId = course.offeredCourseId ?? course.OfferedCourseId;
-      if (!offeredCourseId) continue;
+      const ocId = course.offeredCourseId ?? course.OfferedCourseId;
+      if (ocId == null) continue;
 
       try {
-        const overview = await getCourseFolderOverview(offeredCourseId);
+        const overview = await getCourseFolderOverview(ocId);
         list[index] = {
           ...course,
-          isLocked: overview.isLocked ?? overview.IsLocked ?? course.isLocked,
-          reviewStatus:
-            overview.reviewStatus ??
-            overview.ReviewStatus ??
-            overview.submissionReviewStatus ??
-            overview.SubmissionReviewStatus ??
-            overview.hodReviewStatus ??
-            overview.HodReviewStatus ??
+          submissionStatus:
             overview.submissionStatus ??
             overview.SubmissionStatus ??
-            course.reviewStatus ??
             course.submissionStatus ??
             course.SubmissionStatus,
           rejectionReason:
@@ -663,10 +653,6 @@ export async function enrichCoursesWithFolderReview(courses = [], { concurrency 
   const workers = Math.min(concurrency, list.length);
   await Promise.all(Array.from({ length: workers }, () => runWorker()));
   return list;
-}
-
-export async function getCourseFolderOverview(offeredCourseId) {
-  return await request(`/TeacherSubmission/offered-course/${offeredCourseId}`);
 }
 
 export async function createMasterFolder(offeredCourseId, teacherUserId) {

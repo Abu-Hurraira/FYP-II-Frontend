@@ -6,6 +6,7 @@ import {
   getOfferedCoursesFallbackPage,
 } from "../../api/hodApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import { COURSES_CACHE_KEY, useHodProgram } from "../../context/HodProgramContext.jsx";
 import DashboardWelcomeBanner from "../../components/DashboardWelcomeBanner.jsx";
 import AppSelect from "../../components/AppSelect.jsx";
 import { folderStatusLabel } from "../../utils/weeklyProgressHelpers";
@@ -13,14 +14,14 @@ import { showAlert } from "../../utils/dialogs";
 import { getAuthDisplayName } from "../../utils/helpers";
 
 const PAGE_SIZE = 12;
-const COURSES_CACHE_KEY = "hodWelcomeCoursesCache.v4";
 
-function readCoursesCache() {
+function readCoursesCache(programId) {
   try {
     const raw = sessionStorage.getItem(COURSES_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items) || parsed.items.length === 0) return null;
+    if (programId != null && Number(parsed.programId) !== Number(programId)) return null;
     return parsed;
   } catch {
     return null;
@@ -187,10 +188,14 @@ function CourseMonitorCardSkeleton() {
 
 export default function HodWelcomeScreen() {
   const { user } = useContext(AuthContext);
+  const { selectedProgramId, selectedProgram, loading: programsLoading } = useHodProgram();
   const navigate = useNavigate();
-  const cachedFirstPage = useMemo(() => readCoursesCache(), []);
+  const cachedFirstPage = useMemo(
+    () => (selectedProgramId ? readCoursesCache(selectedProgramId) : null),
+    [selectedProgramId]
+  );
   const [courses, setCourses] = useState(() => cachedFirstPage?.items ?? []);
-  const [loading, setLoading] = useState(() => !cachedFirstPage?.items?.length);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(cachedFirstPage?.page ?? 0);
   const [hasMore, setHasMore] = useState(cachedFirstPage?.hasMore ?? true);
@@ -204,7 +209,6 @@ export default function HodWelcomeScreen() {
     }
   });
   const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [selectedProgram, setSelectedProgram] = useState("All Programs");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
   const [viewMode, setViewMode] = useState("grid"); // 'grid' | 'list'
 
@@ -233,9 +237,18 @@ export default function HodWelcomeScreen() {
 
   const loadPage = useCallback(
     async (nextPage, { replace = false, searchTerm = "" } = {}) => {
+      if (!selectedProgramId) {
+        setCourses([]);
+        setLoading(false);
+        setHasMore(false);
+        setTotalCount(0);
+        return;
+      }
+
       const requestId = ++requestIdRef.current;
 
       if (replace) {
+        setLoading(true);
         setHasMore(true);
       } else {
         if (loadingMoreRef.current) return;
@@ -252,12 +265,14 @@ export default function HodWelcomeScreen() {
             search: searchTerm,
             lite: false,
             hodUserId: user?.userId,
+            programId: selectedProgramId,
           });
         } catch {
           result = await getOfferedCoursesFallbackPage({
             page: nextPage,
             pageSize: PAGE_SIZE,
             search: searchTerm,
+            programId: selectedProgramId,
           });
         }
 
@@ -273,6 +288,7 @@ export default function HodWelcomeScreen() {
 
         if (replace && !searchTerm && result.items.length > 0) {
           writeCoursesCache({
+            programId: selectedProgramId,
             items: result.items,
             page: result.page,
             hasMore: result.hasMore,
@@ -288,16 +304,17 @@ export default function HodWelcomeScreen() {
         }
       }
     },
-    [mergeCourses, user?.userId]
+    [mergeCourses, user?.userId, selectedProgramId]
   );
 
   useEffect(() => {
+    if (programsLoading) return;
     loadPage(1, { replace: true, searchTerm: debouncedSearch });
-  }, [debouncedSearch, loadPage]);
+  }, [debouncedSearch, loadPage, programsLoading, selectedProgramId]);
 
   useEffect(() => {
     const node = sentinelRef.current;
-    if (!node || loading || !hasMore) return undefined;
+    if (!node || loading || !hasMore || !selectedProgramId) return undefined;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -310,33 +327,17 @@ export default function HodWelcomeScreen() {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loading, hasMore, page, debouncedSearch, loadPage]);
+  }, [loading, hasMore, page, debouncedSearch, loadPage, selectedProgramId]);
 
-  // Program Filter Options
-  const programOptions = useMemo(() => {
-    const set = new Set(["All Programs"]);
-    for (const c of courses) {
-      if (c.programCode) set.add(c.programCode);
-      else if (c.programName) set.add(c.programName);
-      else if (c.sectionName?.includes("-")) set.add(c.sectionName.split("-")[0]);
-    }
-    return Array.from(set);
-  }, [courses]);
-
-  // Filtered Courses based on dropdowns
   const filteredCourses = useMemo(() => {
     return courses.filter((c) => {
-      if (selectedProgram !== "All Programs") {
-        const prog = c.programCode || c.programName || c.sectionName || "";
-        if (!prog.toLowerCase().includes(selectedProgram.toLowerCase())) return false;
-      }
       if (selectedStatus !== "All Status") {
         const st = folderStatusLabel(c);
         if (st.toLowerCase() !== selectedStatus.toLowerCase()) return false;
       }
       return true;
     });
-  }, [courses, selectedProgram, selectedStatus]);
+  }, [courses, selectedStatus]);
 
   return (
     <div className="min-h-full bg-page">
@@ -348,7 +349,9 @@ export default function HodWelcomeScreen() {
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Courses</h2>
             <p className="mt-0.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
-              Monitor teacher progress
+              {selectedProgram
+                ? `${selectedProgram.programCode || selectedProgram.programName} · monitor teacher progress`
+                : "Select a program to monitor teacher progress"}
               {!loading && totalCount > 0 ? ` · showing ${filteredCourses.length} of ${totalCount}` : ""}
             </p>
           </div>
@@ -381,19 +384,6 @@ export default function HodWelcomeScreen() {
                 </svg>
               </button>
             </div>
-
-            {/* Program Dropdown */}
-            <AppSelect
-              value={selectedProgram}
-              onChange={(e) => setSelectedProgram(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 outline-none dark:border-[#1b2c2e] dark:bg-[#0d181a] dark:text-gray-200"
-            >
-              {programOptions.map((opt) => (
-                <option key={opt} value={opt} className="bg-white dark:bg-[#0d181a]">
-                  {opt}
-                </option>
-              ))}
-            </AppSelect>
 
             {/* Status Dropdown */}
             <AppSelect
@@ -441,9 +431,11 @@ export default function HodWelcomeScreen() {
 
               {filteredCourses.length === 0 && (
                 <p className="py-16 text-center text-gray-500 dark:text-gray-400">
-                  {debouncedSearch.trim() || selectedProgram !== "All Programs" || selectedStatus !== "All Status"
-                    ? "No courses match your active search/filters."
-                    : "No offered courses found. Add offered courses under Programs → Sessions."}
+                  {!selectedProgramId
+                    ? "Select a program from the top bar to load its courses."
+                    : debouncedSearch.trim() || selectedStatus !== "All Status"
+                      ? "No courses match your active search/filters."
+                      : "No offered courses for this program. Add them under Programs → Sessions."}
                 </p>
               )}
 

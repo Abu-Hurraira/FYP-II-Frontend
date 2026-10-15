@@ -248,23 +248,23 @@ const FacultyScreen = () => {
       </div>
 
       {formVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={closeFormModal} role="presentation">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[#f8fafc] p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={closeFormModal} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[#f8fafc] p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
             <div className="relative mb-4 text-center">
-              <h2 className="text-lg font-semibold text-gray-900">{editingUser ? "Edit" : "Add New Faculty Member"}</h2>
-              <button type="button" className="absolute right-0 top-0 text-3xl text-gray-500" onClick={closeFormModal}>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{editingUser ? "Edit" : "Add New Faculty Member"}</h2>
+              <button type="button" className="absolute right-0 top-0 text-3xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200" onClick={closeFormModal}>
                 ×
               </button>
             </div>
-            <label className="text-sm font-extrabold">{editingUser ? "Change Name" : "Full Name"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Mohsin Ali" />
-            <label className="text-sm font-extrabold">{editingUser ? "Change mail" : "Email"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. mohsin@biit.edu.pk" />
-            <label className="text-sm font-extrabold">{editingUser ? "Change password" : "Password"}</label>
-            <input className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingUser ? "e.g. New password (optional)" : "e.g. Teacher@123"} />
-            <label className="text-sm font-extrabold">{editingUser ? "Change Role" : "Role"}</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">{editingUser ? "Change Name" : "Full Name"}</label>
+            <input className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Mohsin Ali" />
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">{editingUser ? "Change mail" : "Email"}</label>
+            <input className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. mohsin@biit.edu.pk" />
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">{editingUser ? "Change password" : "Password"}</label>
+            <input className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingUser ? "e.g. New password (optional)" : "e.g. Teacher@123"} />
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">{editingUser ? "Change Role" : "Role"}</label>
             <AppSelect
-              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               value={String(roleId)}
               onChange={(e) => setRoleId(Number(e.target.value))}
             >
@@ -274,9 +274,9 @@ const FacultyScreen = () => {
                 </option>
               ))}
             </AppSelect>
-            <label className="text-sm font-extrabold">{editingUser ? "Change Rank" : "Rank"}</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">{editingUser ? "Change Rank" : "Rank"}</label>
             <AppSelect
-              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               value={rank}
               onChange={(e) => setRank(e.target.value)}
             >
@@ -291,12 +291,12 @@ const FacultyScreen = () => {
               <button
                 type="button"
                 onClick={() => setUploadVisible(true)}
-                className="app-btn-primary app-btn-primary-block mb-3 w-full py-3 font-extrabold"
+                className="app-btn-primary app-btn-primary-block mb-3 min-h-[44px] w-full py-3 font-extrabold"
               >
                 Upload File
               </button>
             )}
-            <button type="button" onClick={handleSaveUser} className="app-btn-primary app-btn-primary-block w-full py-3 font-extrabold">
+            <button type="button" onClick={handleSaveUser} className="app-btn-primary app-btn-primary-block min-h-[44px] w-full py-3 font-extrabold">
               {editingUser ? "Save" : "Add Teacher"}
             </button>
           </div>
@@ -304,15 +304,15 @@ const FacultyScreen = () => {
       )}
 
       {uploadVisible && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setUploadVisible(false)} role="presentation">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Upload Faculty List</h2>
-              <button type="button" onClick={() => setUploadVisible(false)} className="text-3xl text-gray-500">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setUploadVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <div className="mb-4 sm:mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Upload Faculty List</h2>
+              <button type="button" onClick={() => setUploadVisible(false)} className="text-3xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
                 ×
               </button>
             </div>
-            <label className="flex h-12 cursor-pointer items-center rounded-lg bg-gray-100 px-3 text-gray-600">
+            <label className="flex min-h-[44px] cursor-pointer items-center rounded-lg bg-gray-100 px-3 text-sm text-gray-600 dark:bg-[#122427] dark:text-gray-300">
               <input type="file" accept=".xlsx" className="hidden" onChange={pickExcelFile} />
               {selectedFile ? selectedFile.name : "Select .xlsx file"}
             </label>
@@ -320,12 +320,12 @@ const FacultyScreen = () => {
               type="button"
               disabled={uploading}
               onClick={handleUploadExcel}
-              className="mt-4 w-full rounded-lg py-3 font-extrabold text-white disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-lg py-3 font-extrabold text-white disabled:opacity-60"
               style={{ backgroundColor: "#1a6b45" }}
             >
               {uploading ? "…" : "⬆ Upload"}
             </button>
-            <button type="button" onClick={() => setUploadVisible(false)} className="mt-3 w-full rounded-lg py-3 font-extrabold text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" onClick={() => setUploadVisible(false)} className="mt-3 min-h-[44px] w-full rounded-lg py-3 font-extrabold text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
               Close
             </button>
           </div>

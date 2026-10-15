@@ -103,7 +103,7 @@ export default function TeacherCloResultsScreen() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
+      <div className="w-full space-y-4 px-4 py-4 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex min-h-[40vh] items-center justify-center">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-brand" />

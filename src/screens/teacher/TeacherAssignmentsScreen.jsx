@@ -8,7 +8,6 @@ import {
   addAssessmentQuestion,
   updateAssessmentQuestion,
   uploadAssessmentFile,
-  parseQuestionPaper,
   getAvailableClos,
   getCourseMenu,
   completeAssessmentSetup,
@@ -229,6 +228,9 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isGraderWorkspace = location.pathname.startsWith("/grader");
+  const focusMode = String(searchParams.get("focus") || "").toLowerCase();
+  const isSamplesFocus = isGraderWorkspace && focusMode === "samples";
+  const isMarksFocus = isGraderWorkspace && (focusMode === "marks" || !isSamplesFocus);
   const marksBase = isGraderWorkspace ? "/grader" : "/teacher";
   const isExamHodFlow = variant === "Mid" || variant === "Final";
   const examTypeCode = examContentTypeCode(variant);
@@ -318,13 +320,26 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
       return;
     }
 
+    const proposedTotal = Number(editTotalMarks) || cfg.defaultTotalMarks;
+    const existingQSum = (selectedAssessmentDetail?.questions || []).reduce(
+      (sum, q) => sum + (Number(q.marks) || 0),
+      0
+    );
+    if (existingQSum > 0 && proposedTotal < existingQSum) {
+      showAlert(
+        "Validation Error",
+        `Total marks (${proposedTotal}) cannot be less than the existing question marks (${existingQSum}). Reduce question marks first.`
+      );
+      return;
+    }
+
     try {
       setIsUpdatingTemplate(true);
       const updated = await updateAssessment(selectedAssessmentId, {
         teacherUserId,
         title: cfg.usesCustomTitle ? editTitle.trim() : (cfg.fixedTitle || editTitle.trim() || cfg.singularTitle),
         dueDate: cfg.usesDueDate ? editDueDate || null : null,
-        totalMarks: Number(editTotalMarks) || cfg.defaultTotalMarks,
+        totalMarks: proposedTotal,
       });
 
       setSelectedAssessmentDetail(updated);
@@ -348,7 +363,6 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
   const [uploadPurpose, setUploadPurpose] = useState("Solution");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [isParsingPaper, setIsParsingPaper] = useState(false);
   const [isTogglingSetup, setIsTogglingSetup] = useState(false);
 
   const [loadSchemeModal, setLoadSchemeModal] = useState(false);
@@ -764,11 +778,12 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
     });
   };
 
-  const handlePartCloChange = (qIndex, pIndex, cloId, percentage) => {
+  const handlePartCloChange = (qIndex, pIndex, mapIndex, cloId, percentage) => {
     setQuestionsDraft((prev) => {
       const copy = [...prev];
       const q = { ...copy[qIndex], parts: [...(copy[qIndex].parts || [])] };
       const part = { ...q.parts[pIndex] };
+      const mappings = [...(part.cloMappings || [])];
       const targetCloId = Number(cloId);
       const selectedClo = clos.find((c) => Number(c.cloId) === targetCloId);
       const maxAllowed = remainingCloPercent(
@@ -778,18 +793,65 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
         usedOnOtherAssessments(selectedClo, selectedAssessmentDetail),
         pIndex
       );
-      if (percentage === "" || percentage === null || percentage === undefined) {
-        part.cloMappings = [
-          { cloId: targetCloId, cloCode: selectedClo?.cloCode || `CLO-${targetCloId}`, percentage: "" },
-        ];
-      } else {
+      const next = {
+        cloId: targetCloId,
+        cloCode: selectedClo?.cloCode || `CLO-${targetCloId}`,
+        percentage: "",
+      };
+      if (percentage !== "" && percentage !== null && percentage !== undefined) {
         let num = parseFloat(percentage);
         if (Number.isNaN(num) || num < 0) num = 0;
         if (num > maxAllowed) num = maxAllowed;
-        part.cloMappings = [
-          { cloId: targetCloId, cloCode: selectedClo?.cloCode || `CLO-${targetCloId}`, percentage: num },
-        ];
+        next.percentage = num;
       }
+      if (mapIndex >= 0 && mapIndex < mappings.length) {
+        mappings[mapIndex] = next;
+      } else {
+        mappings.push(next);
+      }
+      part.cloMappings = mappings;
+      q.parts[pIndex] = part;
+      copy[qIndex] = q;
+      return copy;
+    });
+  };
+
+  const handleAddPartCloMapping = (qIndex, pIndex) => {
+    setQuestionsDraft((prev) => {
+      const copy = [...prev];
+      const q = { ...copy[qIndex], parts: [...(copy[qIndex].parts || [])] };
+      const part = { ...q.parts[pIndex] };
+      const mappings = [...(part.cloMappings || [])];
+      const usedIds = new Set(mappings.map((m) => Number(m.cloId)));
+      const nextClo = (clos || []).find((c) => {
+        if (usedIds.has(Number(c.cloId))) return false;
+        const rem = remainingCloPercent(
+          prev,
+          c.cloId,
+          qIndex,
+          usedOnOtherAssessments(c, selectedAssessmentDetail),
+          pIndex
+        );
+        return rem > 0;
+      });
+      if (!nextClo) return prev;
+      mappings.push({ cloId: nextClo.cloId, cloCode: nextClo.cloCode, percentage: 0 });
+      part.cloMappings = mappings;
+      q.parts[pIndex] = part;
+      copy[qIndex] = q;
+      return copy;
+    });
+  };
+
+  const handleRemovePartCloMapping = (qIndex, pIndex, mapIndex) => {
+    setQuestionsDraft((prev) => {
+      const copy = [...prev];
+      const q = { ...copy[qIndex], parts: [...(copy[qIndex].parts || [])] };
+      const part = { ...q.parts[pIndex] };
+      const mappings = [...(part.cloMappings || [])];
+      if (mappings.length <= 1) return prev;
+      mappings.splice(mapIndex, 1);
+      part.cloMappings = mappings;
       q.parts[pIndex] = part;
       copy[qIndex] = q;
       return copy;
@@ -822,9 +884,10 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
     });
   };
 
-  const handleQuestionCloChange = (qIndex, cloId, percentage) => {
+  const handleQuestionCloChange = (qIndex, mapIndex, cloId, percentage) => {
     setQuestionsDraft((prev) => {
       const copy = [...prev];
+      const mappings = [...(copy[qIndex].cloMappings || [])];
       const targetCloId = Number(cloId);
       const selectedClo = clos.find((c) => Number(c.cloId) === targetCloId);
       const maxAllowed = remainingCloPercent(
@@ -834,34 +897,58 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
         usedOnOtherAssessments(selectedClo, selectedAssessmentDetail)
       );
 
-      if (percentage === "" || percentage === null || percentage === undefined) {
-        copy[qIndex] = {
-          ...copy[qIndex],
-          cloMappings: [
-            {
-              cloId: targetCloId,
-              cloCode: selectedClo?.cloCode || `CLO-${targetCloId}`,
-              percentage: "",
-            },
-          ],
-        };
-        return copy;
+      const next = {
+        cloId: targetCloId,
+        cloCode: selectedClo?.cloCode || `CLO-${targetCloId}`,
+        percentage: "",
+      };
+      if (percentage !== "" && percentage !== null && percentage !== undefined) {
+        let num = parseFloat(percentage);
+        if (Number.isNaN(num) || num < 0) num = 0;
+        if (num > maxAllowed) num = maxAllowed;
+        next.percentage = num;
       }
 
-      let num = parseFloat(percentage);
-      if (Number.isNaN(num) || num < 0) num = 0;
-      if (num > maxAllowed) num = maxAllowed;
+      if (mapIndex >= 0 && mapIndex < mappings.length) {
+        mappings[mapIndex] = next;
+      } else {
+        mappings.push(next);
+      }
 
-      copy[qIndex] = {
-        ...copy[qIndex],
-        cloMappings: [
-          {
-            cloId: targetCloId,
-            cloCode: selectedClo?.cloCode || `CLO-${targetCloId}`,
-            percentage: num,
-          },
-        ],
-      };
+      copy[qIndex] = { ...copy[qIndex], cloMappings: mappings };
+      return copy;
+    });
+  };
+
+  const handleAddQuestionCloMapping = (qIndex) => {
+    setQuestionsDraft((prev) => {
+      const copy = [...prev];
+      const mappings = [...(copy[qIndex].cloMappings || [])];
+      const usedIds = new Set(mappings.map((m) => Number(m.cloId)));
+      const nextClo = (clos || []).find((c) => {
+        if (usedIds.has(Number(c.cloId))) return false;
+        const rem = remainingCloPercent(
+          prev,
+          c.cloId,
+          qIndex,
+          usedOnOtherAssessments(c, selectedAssessmentDetail)
+        );
+        return rem > 0;
+      });
+      if (!nextClo) return prev;
+      mappings.push({ cloId: nextClo.cloId, cloCode: nextClo.cloCode, percentage: 0 });
+      copy[qIndex] = { ...copy[qIndex], cloMappings: mappings };
+      return copy;
+    });
+  };
+
+  const handleRemoveQuestionCloMapping = (qIndex, mapIndex) => {
+    setQuestionsDraft((prev) => {
+      const copy = [...prev];
+      const mappings = [...(copy[qIndex].cloMappings || [])];
+      if (mappings.length <= 1) return prev;
+      mappings.splice(mapIndex, 1);
+      copy[qIndex] = { ...copy[qIndex], cloMappings: mappings };
       return copy;
     });
   };
@@ -899,13 +986,29 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
           return;
         }
         if (!item.cloMappings || item.cloMappings.length === 0) {
-          showAlert("Validation Error", `Please map a CLO for ${item.questionNo}.`);
+          showAlert("Validation Error", `Please map at least one CLO for ${item.questionNo}.`);
           return;
         }
-        const pct = Number(item.cloMappings[0]?.percentage);
-        if (!Number.isFinite(pct) || pct <= 0) {
-          showAlert("Validation Error", `Enter a CLO percentage greater than 0 for ${item.questionNo}.`);
-          return;
+        const seenCloIds = new Set();
+        for (const mapping of item.cloMappings) {
+          const cloId = Number(mapping?.cloId);
+          if (!Number.isFinite(cloId) || cloId <= 0) {
+            showAlert("Validation Error", `Select a CLO for ${item.questionNo}.`);
+            return;
+          }
+          if (seenCloIds.has(cloId)) {
+            showAlert("Validation Error", `Duplicate CLO mapping on ${item.questionNo}. Each CLO can be mapped once.`);
+            return;
+          }
+          seenCloIds.add(cloId);
+          const pct = Number(mapping?.percentage);
+          if (!Number.isFinite(pct) || pct <= 0) {
+            showAlert(
+              "Validation Error",
+              `Enter a CLO percentage greater than 0 for every CLO on ${item.questionNo}.`
+            );
+            return;
+          }
         }
       }
     }
@@ -1011,23 +1114,6 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
     setUploadModalOpen(true);
   };
 
-  const applyParsedPaper = async (assessmentId) => {
-    try {
-      setIsParsingPaper(true);
-      const parsed = await parseQuestionPaper(assessmentId, teacherUserId);
-      const incoming = (parsed.questions ?? parsed.Questions ?? []).map(mapQuestionDraft);
-      if (incoming.length > 0) {
-        setQuestionsDraft(incoming);
-        setExpandedQuestions(Object.fromEntries(incoming.map((_, i) => [i, true])));
-      }
-      showAlert("Paper read", parsed.message ?? parsed.Message ?? "Review the questions and CLO mapping, then save.");
-    } catch (err) {
-      showAlert("Could not read paper", err.message || "Add questions below.");
-    } finally {
-      setIsParsingPaper(false);
-    }
-  };
-
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedAssessmentId) {
       showAlert("Validation Error", "Please select a file first.");
@@ -1047,9 +1133,6 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
       setUploadModalOpen(false);
       setSelectedFile(null);
       await loadDetail(selectedAssessmentId);
-      if (String(uploadPurpose).toLowerCase().includes("question")) {
-        await applyParsedPaper(selectedAssessmentId);
-      }
     } catch (err) {
       showAlert("Upload Error", err.message || "Failed to upload file.");
     } finally {
@@ -1219,11 +1302,6 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
     filesForAssessment.find(
       (f) => (f.filePurpose ?? f.FilePurpose ?? "").toLowerCase() === purpose.toLowerCase()
     );
-  const questionPaperFile = fileByPurpose(
-    "Question Paper",
-    selectedAssessmentDetail?.questionPaperFile,
-    selectedAssessmentDetail?.QuestionPaperFile
-  );
   const solutionFile = fileByPurpose(
     "Solution",
     selectedAssessmentDetail?.solutionFile,
@@ -1299,9 +1377,10 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               <button
                 type="button"
                 onClick={() => setSelectedAssessmentId(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 font-extrabold"
+                aria-label="Go back"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-xl font-semibold leading-none text-gray-600 transition hover:bg-brand-muted hover:text-brand-dark"
               >
-                ‹
+                <span aria-hidden="true">←</span>
               </button>
             ) : (
               <PageBackButton className="mt-0.5 shrink-0" />
@@ -1310,7 +1389,9 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               <h1 className="truncate text-xl font-semibold text-gray-900 dark:text-white">
                 {selectedAssessmentId
                   ? displayAssessmentTitle(selectedAssessmentDetail, cfg)
-                  : cfg.pluralTitle}
+                  : isSamplesFocus
+                    ? `${cfg.singularTitle} samples`
+                    : cfg.pluralTitle}
               </h1>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 {courseTitle}
@@ -1338,8 +1419,12 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
       <div className="w-full px-4 pb-8 pt-3 sm:px-6 lg:px-8 space-y-4">
         {/* VIEW 1: ASSIGNMENTS LIST (Image 3) */}
         {!selectedAssessmentId && (
-          <div className="space-y-4 max-w-2xl mx-auto">
-            {isExamHodFlow && canManageExam && isExamRejected ? (
+          <div className="space-y-4 w-full">
+            {isSamplesFocus ? (
+              <div className="rounded-2xl border border-emerald-800/20 bg-[#f4fbf7] p-4 text-xs sm:text-sm font-medium text-[#15803d] shadow-sm dark:bg-[#091816] dark:text-emerald-300 dark:border-emerald-800/30">
+                Open an exam and upload Best / Average / Worst sample files. Marks setup is not required for this task.
+              </div>
+            ) : isExamHodFlow && canManageExam && isExamRejected ? (
               <HodRejectionBanner title={`${cfg.singularTitle.toLowerCase()} exam`} reason={examReview.hodFeedback} />
             ) : isExamHodFlow && canManageExam && isExamPending ? (
               <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 p-4 text-xs sm:text-sm font-medium text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
@@ -1359,7 +1444,9 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               </div>
             ) : (
               <div className="rounded-2xl border border-emerald-800/20 bg-[#f4fbf7] p-4 text-xs sm:text-sm font-bold text-[#15803d] shadow-sm dark:bg-[#091816] dark:text-emerald-300 dark:border-emerald-800/30">
-                {cfg.listBanner}
+                {isMarksFocus
+                  ? "Open an assessment to enter student marks."
+                  : cfg.listBanner}
               </div>
             )}
 
@@ -1393,8 +1480,12 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                           {displayAssessmentTitle(item, cfg)}
                         </h3>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                          {item.dueDate ? `Due ${item.dueDate} · ` : ""}
-                          {item.totalMarks != null ? `${item.totalMarks} marks` : "Set total marks"}
+                          {item.dueDate ? `Due ${item.dueDate}` : isSamplesFocus ? "Upload sample files" : ""}
+                          {!isSamplesFocus && item.totalMarks != null
+                            ? `${item.dueDate ? " · " : ""}${item.totalMarks} marks`
+                            : !isSamplesFocus
+                              ? `${item.dueDate ? " · " : ""}Set total marks`
+                              : ""}
                         </p>
                       </div>
 
@@ -1404,7 +1495,11 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                             Required
                           </span>
                         )}
-                        {isCompleted ? (
+                        {isSamplesFocus ? (
+                          <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-black px-3 py-1 rounded-lg">
+                            Samples
+                          </span>
+                        ) : isCompleted ? (
                           <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-black px-3 py-1 rounded-lg">
                             Completed
                           </span>
@@ -1457,8 +1552,12 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
         {/* VIEW 2: ASSIGNMENT SETUP / DETAIL (Image 1) */}
         {selectedAssessmentId && (
-          <div className="space-y-4 max-w-2xl mx-auto">
-            {isExamHodFlow && canManageExam && isExamRejected ? (
+          <div className="space-y-4 w-full">
+            {isSamplesFocus ? (
+              <div className="rounded-2xl border border-emerald-800/20 bg-[#f4fbf7] p-4 text-xs sm:text-sm font-medium text-[#15803d] shadow-sm dark:bg-[#091816] dark:text-emerald-300 dark:border-emerald-800/30">
+                Upload Best, Average, and Worst samples. After all three are uploaded they merge into one document in the Samples folder.
+              </div>
+            ) : isExamHodFlow && canManageExam && isExamRejected ? (
               <HodRejectionBanner title={`${cfg.singularTitle.toLowerCase()} exam`} reason={examReview.hodFeedback} />
             ) : isExamHodFlow && canManageExam && isExamPending ? (
               <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 p-4 text-xs sm:text-sm font-medium text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
@@ -1477,7 +1576,6 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               <>
                 {!isGraderWorkspace && (
                   <>
-                    {renderUploadCard("Question Paper", "Question Paper", questionPaperFile)}
                     {renderUploadCard(cfg.solutionLabel || "Solution", "Solution", solutionFile)}
                     {renderUploadCard("Best Sample", "Best Sample", bestSampleFile)}
                     {renderUploadCard("Average Sample", "Average Sample", averageSampleFile)}
@@ -1485,7 +1583,16 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   </>
                 )}
 
-                {/* Card 3: Enter Marks */}
+                {isSamplesFocus ? (
+                  <>
+                    {renderUploadCard("Best Sample", "Best Sample", bestSampleFile)}
+                    {renderUploadCard("Average Sample", "Average Sample", averageSampleFile)}
+                    {renderUploadCard("Worst Sample", "Worst Sample", worstSampleFile)}
+                  </>
+                ) : null}
+
+                {/* Card 3: Enter Marks — graders only when marks focus (not samples) */}
+                {(!isGraderWorkspace || isMarksFocus) && !isSamplesFocus ? (
                 <div
                   onClick={openMarksEntry}
                   className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-4 shadow-card shadow-sm transition hover:border-emerald-500/30 dark:border-[#1b2c2e] dark:bg-[#0c181a] flex items-center justify-between"
@@ -1500,20 +1607,11 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   </div>
                   <span className="text-xl font-bold text-gray-400">›</span>
                 </div>
+                ) : null}
 
                 {/* Card 4: Questions & CLO Mapping */}
                 {!isGraderWorkspace && (
                 <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a] space-y-4">
-                  {canEditPaper ? (
-                    <button
-                      type="button"
-                      disabled={isParsingPaper}
-                      onClick={() => applyParsedPaper(selectedAssessmentId)}
-                      className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 disabled:opacity-50"
-                    >
-                      {isParsingPaper ? "Reading paper…" : "Read questions from uploaded paper"}
-                    </button>
-                  ) : null}
                   <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1b2c2e] pb-3">
                     <div>
                       <h3 className="text-lg font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1592,16 +1690,26 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                     {questionsDraft.map((q, idx) => {
                       const isExpanded = Boolean(expandedQuestions[idx]);
                       const hasParts = (q.parts || []).length > 0;
-                      const primaryClo = q.cloMappings?.[0];
-                      const selectedCloId = primaryClo?.cloId || (clos[0]?.cloId ?? "");
-                      const cloRemaining = remainingFor(selectedCloId, idx);
-                      const currentPct = primaryClo?.percentage;
+                      const questionCloMappings = q.cloMappings || [];
+                      const formatCloBadge = (mappings) =>
+                        (mappings || [])
+                          .filter((m) => m?.cloId)
+                          .map((m) => `${m.cloCode || `CLO-${m.cloId}`} (${m.percentage ?? 0}%)`)
+                          .join(" · ");
                       const partCloBadges = hasParts
                         ? (q.parts || []).map((p) => ({
                             no: p.questionNo,
-                            clo: p.cloMappings?.[0],
+                            label: formatCloBadge(p.cloMappings),
                           }))
                         : [];
+                      const questionCloLabel = formatCloBadge(questionCloMappings);
+                      const usedQuestionCloIds = new Set(
+                        questionCloMappings.map((m) => Number(m.cloId)).filter(Boolean)
+                      );
+                      const canAddQuestionClo = (clos || []).some((c) => {
+                        if (usedQuestionCloIds.has(Number(c.cloId))) return false;
+                        return remainingFor(c.cloId, idx) > 0;
+                      });
 
                       return (
                         <div
@@ -1611,7 +1719,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                           {/* Collapsible Card Header */}
                           <div
                             onClick={() => toggleExpandQuestion(idx)}
-                            className="flex items-center justify-between px-4 py-3 cursor-pointer bg-white hover:bg-gray-50/80 dark:bg-[#0c181a] dark:hover:bg-[#112225] transition"
+                            className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-4 py-3 cursor-pointer bg-white hover:bg-gray-50/80 dark:bg-[#0c181a] dark:hover:bg-[#112225] transition"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <span className="shrink-0 text-sm font-black text-gray-900 dark:text-white">
@@ -1622,7 +1730,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                               </p>
                             </div>
 
-                            <div className="flex items-center gap-2.5 shrink-0 ml-3">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 ml-auto sm:ml-3">
                               <span className="bg-[#15803d]/10 text-[#15803d] dark:bg-emerald-950 dark:text-emerald-300 text-xs font-black px-2.5 py-0.5 rounded-full">
                                 {questionMarks(q) || 0} Marks
                               </span>
@@ -1632,14 +1740,15 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                                   <span className="bg-violet-50 text-violet-800 dark:bg-violet-950 dark:text-violet-200 text-xs font-black px-2.5 py-0.5 rounded-full border border-violet-200/60 dark:border-violet-800/40">
                                     {q.parts.length} part{q.parts.length === 1 ? "" : "s"}
                                   </span>
-                                  {partCloBadges.some((b) => b.clo) ? (
+                                  {partCloBadges.some((b) => b.label) ? (
                                     partCloBadges.map((b) =>
-                                      b.clo ? (
+                                      b.label ? (
                                         <span
                                           key={b.no}
-                                          className="bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200 text-xs font-black px-2.5 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800/40"
+                                          className="max-w-[14rem] truncate bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200 text-xs font-black px-2.5 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800/40"
+                                          title={`${b.no}: ${b.label}`}
                                         >
-                                          {b.no} {b.clo.cloCode} ({b.clo.percentage}%)
+                                          {b.no} {b.label}
                                         </span>
                                       ) : null
                                     )
@@ -1649,9 +1758,12 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                                     </span>
                                   )}
                                 </>
-                              ) : primaryClo ? (
-                                <span className="bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200 text-xs font-black px-2.5 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800/40">
-                                  {primaryClo.cloCode} ({primaryClo.percentage}%)
+                              ) : questionCloLabel ? (
+                                <span
+                                  className="max-w-[16rem] truncate bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200 text-xs font-black px-2.5 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800/40"
+                                  title={questionCloLabel}
+                                >
+                                  {questionCloLabel}
                                 </span>
                               ) : (
                                 <span className="bg-amber-50 text-amber-800 text-xs font-extrabold px-2 py-0.5 rounded-full border border-amber-200">
@@ -1706,54 +1818,107 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
                               {!hasParts && (
                               <div className="rounded-lg bg-emerald-50/70 border border-emerald-200/60 p-2.5 dark:bg-[#0f241f] dark:border-emerald-800/30 space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                   <span className="text-xs font-black text-[#15803d] dark:text-[#34d399]">
                                     Map CLO
                                   </span>
+                                  {canEditPaper && (
+                                    <button
+                                      type="button"
+                                      disabled={!canAddQuestionClo}
+                                      onClick={() => handleAddQuestionCloMapping(idx)}
+                                      className="rounded-lg bg-white px-2 py-0.5 text-[11px] font-extrabold text-[#15803d] border border-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#122427] dark:border-emerald-800/40 dark:text-emerald-300"
+                                    >
+                                      + Add CLO
+                                    </button>
+                                  )}
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                  <AppSelect
-                                    value={selectedCloId}
-                                    onChange={(e) => {
-                                      const nextCloId = e.target.value;
-                                      const rem = remainingFor(nextCloId, idx);
-                                      const current = Number(q.cloMappings?.[0]?.percentage) || 0;
-                                      handleQuestionCloChange(idx, nextCloId, Math.min(current, rem));
-                                    }}
-                                    className="flex-1 rounded-lg border border-gray-200 bg-white py-1.5 px-2 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
-                                  >
-                                    {clos.map((c) => {
-                                      const remOverall = remainingFor(c.cloId);
-                                      return (
-                                        <option
-                                          key={c.cloId}
-                                          value={c.cloId}
-                                          disabled={
-                                            remOverall <= 0 && Number(selectedCloId) !== Number(c.cloId)
-                                          }
+                                {(questionCloMappings.length ? questionCloMappings : [{ cloId: "", percentage: "" }]).map(
+                                  (mapping, mapIdx) => {
+                                    const selectedCloId = mapping?.cloId || "";
+                                    const cloRemaining = selectedCloId
+                                      ? remainingFor(selectedCloId, idx)
+                                      : 0;
+                                    const currentPct = mapping?.percentage;
+                                    const takenByOtherRows = new Set(
+                                      questionCloMappings
+                                        .map((m, i) => (i === mapIdx ? null : Number(m.cloId)))
+                                        .filter(Boolean)
+                                    );
+                                    return (
+                                      <div key={`q-${idx}-clo-${mapIdx}`} className="flex items-center gap-2">
+                                        <AppSelect
+                                          value={selectedCloId}
+                                          disabled={!canEditPaper}
+                                          onChange={(e) => {
+                                            const nextCloId = e.target.value;
+                                            const rem = remainingFor(nextCloId, idx);
+                                            const current = Number(mapping?.percentage) || 0;
+                                            handleQuestionCloChange(
+                                              idx,
+                                              mapIdx,
+                                              nextCloId,
+                                              Math.min(current, rem)
+                                            );
+                                          }}
+                                          className="flex-1 rounded-lg border border-gray-200 bg-white py-1.5 px-2 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                                         >
-                                          {c.cloCode} ({remOverall}% left)
-                                          {c.description ? ` - ${c.description.substring(0, 20)}` : ""}
-                                        </option>
-                                      );
-                                    })}
-                                  </AppSelect>
+                                          {!selectedCloId && (
+                                            <option value="">Select CLO</option>
+                                          )}
+                                          {clos.map((c) => {
+                                            const remOverall = remainingFor(c.cloId, idx);
+                                            const taken = takenByOtherRows.has(Number(c.cloId));
+                                            return (
+                                              <option
+                                                key={c.cloId}
+                                                value={c.cloId}
+                                                disabled={
+                                                  taken ||
+                                                  (remOverall <= 0 &&
+                                                    Number(selectedCloId) !== Number(c.cloId))
+                                                }
+                                              >
+                                                {c.cloCode} ({remOverall}% left)
+                                                {c.description
+                                                  ? ` - ${c.description.substring(0, 20)}`
+                                                  : ""}
+                                              </option>
+                                            );
+                                          })}
+                                        </AppSelect>
 
-                                  <PercentInput
-                                    min={0}
-                                    max={cloRemaining}
-                                    value={
-                                      currentPct === "" || currentPct == null
-                                        ? ""
-                                        : Math.min(Number(currentPct) || 0, cloRemaining)
-                                    }
-                                    onChange={(next) => handleQuestionCloChange(idx, selectedCloId, next)}
-                                    title={`Coverage remaining: ${cloRemaining}%`}
-                                    className="w-16 rounded-lg border border-gray-200 bg-white py-1.5 px-1 text-center text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
-                                  />
-                                  <span className="text-xs font-bold text-gray-500">%</span>
-                                </div>
+                                        <PercentInput
+                                          min={0}
+                                          max={cloRemaining}
+                                          disabled={!canEditPaper || !selectedCloId}
+                                          value={
+                                            currentPct === "" || currentPct == null
+                                              ? ""
+                                              : Math.min(Number(currentPct) || 0, cloRemaining)
+                                          }
+                                          onChange={(next) =>
+                                            handleQuestionCloChange(idx, mapIdx, selectedCloId, next)
+                                          }
+                                          title={`Coverage remaining: ${cloRemaining}%`}
+                                          className="w-16 rounded-lg border border-gray-200 bg-white py-1.5 px-1 text-center text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
+                                        />
+                                        <span className="text-xs font-bold text-gray-500">%</span>
+                                        {canEditPaper && questionCloMappings.length > 1 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveQuestionCloMapping(idx, mapIdx)}
+                                            className="text-xs font-extrabold text-red-600 hover:text-red-700"
+                                            title="Remove CLO mapping"
+                                          >
+                                            ✕
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                )}
                               </div>
                               )}
 
@@ -1775,10 +1940,14 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
                                 {hasParts &&
                                   q.parts.map((part, pIdx) => {
-                                    const partClo = part.cloMappings?.[0];
-                                    const partCloId = partClo?.cloId || (clos[0]?.cloId ?? "");
-                                    const partRemaining = remainingFor(partCloId, idx, questionsDraft, pIdx);
-                                    const partPct = partClo?.percentage;
+                                    const partCloMappings = part.cloMappings || [];
+                                    const usedPartCloIds = new Set(
+                                      partCloMappings.map((m) => Number(m.cloId)).filter(Boolean)
+                                    );
+                                    const canAddPartClo = (clos || []).some((c) => {
+                                      if (usedPartCloIds.has(Number(c.cloId))) return false;
+                                      return remainingFor(c.cloId, idx, questionsDraft, pIdx) > 0;
+                                    });
                                     return (
                                       <div
                                         key={`${part.questionNo}-${pIdx}`}
@@ -1825,52 +1994,128 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                                           />
                                         </div>
                                         <div className="rounded-lg bg-emerald-50/70 border border-emerald-200/60 p-2.5 dark:bg-[#0f241f] dark:border-emerald-800/30 space-y-2">
-                                          <span className="text-xs font-black text-[#15803d] dark:text-[#34d399]">
-                                            Map CLO
-                                          </span>
-                                          <div className="flex items-center gap-2">
-                                            <AppSelect
-                                              value={partCloId}
-                                              disabled={!canEditPaper}
-                                              onChange={(e) => {
-                                                const nextCloId = e.target.value;
-                                                const rem = remainingFor(nextCloId, idx, questionsDraft, pIdx);
-                                                const current = Number(part.cloMappings?.[0]?.percentage) || 0;
-                                                handlePartCloChange(idx, pIdx, nextCloId, Math.min(current, rem));
-                                              }}
-                                              className="flex-1 rounded-lg border border-gray-200 bg-white py-1.5 px-2 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
-                                            >
-                                              {clos.map((c) => {
-                                                const remOverall = remainingFor(c.cloId, idx, questionsDraft, pIdx);
-                                                return (
-                                                  <option
-                                                    key={c.cloId}
-                                                    value={c.cloId}
-                                                    disabled={
-                                                      remOverall <= 0 && Number(partCloId) !== Number(c.cloId)
-                                                    }
-                                                  >
-                                                    {c.cloCode} ({remOverall}% left)
-                                                    {c.description ? ` - ${c.description.substring(0, 20)}` : ""}
-                                                  </option>
-                                                );
-                                              })}
-                                            </AppSelect>
-                                            <PercentInput
-                                              min={0}
-                                              max={partRemaining}
-                                              disabled={!canEditPaper}
-                                              value={
-                                                partPct === "" || partPct == null
-                                                  ? ""
-                                                  : Math.min(Number(partPct) || 0, partRemaining)
-                                              }
-                                              onChange={(next) => handlePartCloChange(idx, pIdx, partCloId, next)}
-                                              title={`Coverage remaining: ${partRemaining}%`}
-                                              className="w-16 rounded-lg border border-gray-200 bg-white py-1.5 px-1 text-center text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
-                                            />
-                                            <span className="text-xs font-bold text-gray-500">%</span>
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-xs font-black text-[#15803d] dark:text-[#34d399]">
+                                              Map CLO
+                                            </span>
+                                            {canEditPaper && (
+                                              <button
+                                                type="button"
+                                                disabled={!canAddPartClo}
+                                                onClick={() => handleAddPartCloMapping(idx, pIdx)}
+                                                className="rounded-lg bg-white px-2 py-0.5 text-[11px] font-extrabold text-[#15803d] border border-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#122427] dark:border-emerald-800/40 dark:text-emerald-300"
+                                              >
+                                                + Add CLO
+                                              </button>
+                                            )}
                                           </div>
+                                          {(partCloMappings.length
+                                            ? partCloMappings
+                                            : [{ cloId: "", percentage: "" }]
+                                          ).map((mapping, mapIdx) => {
+                                            const partCloId = mapping?.cloId || "";
+                                            const partRemaining = partCloId
+                                              ? remainingFor(partCloId, idx, questionsDraft, pIdx)
+                                              : 0;
+                                            const partPct = mapping?.percentage;
+                                            const takenByOtherRows = new Set(
+                                              partCloMappings
+                                                .map((m, i) => (i === mapIdx ? null : Number(m.cloId)))
+                                                .filter(Boolean)
+                                            );
+                                            return (
+                                              <div
+                                                key={`${part.questionNo}-clo-${mapIdx}`}
+                                                className="flex items-center gap-2"
+                                              >
+                                                <AppSelect
+                                                  value={partCloId}
+                                                  disabled={!canEditPaper}
+                                                  onChange={(e) => {
+                                                    const nextCloId = e.target.value;
+                                                    const rem = remainingFor(
+                                                      nextCloId,
+                                                      idx,
+                                                      questionsDraft,
+                                                      pIdx
+                                                    );
+                                                    const current = Number(mapping?.percentage) || 0;
+                                                    handlePartCloChange(
+                                                      idx,
+                                                      pIdx,
+                                                      mapIdx,
+                                                      nextCloId,
+                                                      Math.min(current, rem)
+                                                    );
+                                                  }}
+                                                  className="flex-1 rounded-lg border border-gray-200 bg-white py-1.5 px-2 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
+                                                >
+                                                  {!partCloId && (
+                                                    <option value="">Select CLO</option>
+                                                  )}
+                                                  {clos.map((c) => {
+                                                    const remOverall = remainingFor(
+                                                      c.cloId,
+                                                      idx,
+                                                      questionsDraft,
+                                                      pIdx
+                                                    );
+                                                    const taken = takenByOtherRows.has(Number(c.cloId));
+                                                    return (
+                                                      <option
+                                                        key={c.cloId}
+                                                        value={c.cloId}
+                                                        disabled={
+                                                          taken ||
+                                                          (remOverall <= 0 &&
+                                                            Number(partCloId) !== Number(c.cloId))
+                                                        }
+                                                      >
+                                                        {c.cloCode} ({remOverall}% left)
+                                                        {c.description
+                                                          ? ` - ${c.description.substring(0, 20)}`
+                                                          : ""}
+                                                      </option>
+                                                    );
+                                                  })}
+                                                </AppSelect>
+                                                <PercentInput
+                                                  min={0}
+                                                  max={partRemaining}
+                                                  disabled={!canEditPaper || !partCloId}
+                                                  value={
+                                                    partPct === "" || partPct == null
+                                                      ? ""
+                                                      : Math.min(Number(partPct) || 0, partRemaining)
+                                                  }
+                                                  onChange={(next) =>
+                                                    handlePartCloChange(
+                                                      idx,
+                                                      pIdx,
+                                                      mapIdx,
+                                                      partCloId,
+                                                      next
+                                                    )
+                                                  }
+                                                  title={`Coverage remaining: ${partRemaining}%`}
+                                                  className="w-16 rounded-lg border border-gray-200 bg-white py-1.5 px-1 text-center text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
+                                                />
+                                                <span className="text-xs font-bold text-gray-500">%</span>
+                                                {canEditPaper && partCloMappings.length > 1 && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      handleRemovePartCloMapping(idx, pIdx, mapIdx)
+                                                    }
+                                                    className="text-xs font-extrabold text-red-600 hover:text-red-700"
+                                                    title="Remove CLO mapping"
+                                                  >
+                                                    ✕
+                                                  </button>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
                                         </div>
                                       </div>
                                     );
@@ -1969,8 +2214,8 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
       {/* MODAL 1: ADD ASSIGNMENT TEMPLATE (Image 2) */}
       {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e] space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-5 sm:p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e] space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-black text-gray-900 dark:text-white">
@@ -1983,7 +2228,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               <button
                 type="button"
                 onClick={() => setAddModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-lg"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-lg p-1"
               >
                 ✕
               </button>
@@ -2001,7 +2246,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   placeholder={cfg.titlePlaceholder}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50/50 p-3 text-xs sm:text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
+                  className="w-full min-h-[40px] rounded-2xl border border-gray-200 bg-gray-50/50 p-3 text-xs sm:text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 />
               </div>
               )}
@@ -2015,7 +2260,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50/50 p-3 text-xs sm:text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
+                  className="w-full min-h-[40px] rounded-2xl border border-gray-200 bg-gray-50/50 p-3 text-xs sm:text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 />
               </div>
               )}
@@ -2032,7 +2277,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   placeholder={`e.g. ${cfg.defaultTotalMarks}`}
                   value={newTotalMarks}
                   onChange={(e) => setNewTotalMarks(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50/50 p-3 text-xs sm:text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
+                  className="w-full min-h-[40px] rounded-2xl border border-gray-200 bg-gray-50/50 p-3 text-xs sm:text-sm font-semibold text-gray-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 />
               </div>
 
@@ -2040,7 +2285,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                 <button
                   type="submit"
                   disabled={isSubmittingTemplate}
-                  className="w-full bg-[#15803d] hover:bg-[#166534] text-white font-black py-3.5 rounded-2xl text-sm shadow-md transition disabled:opacity-50"
+                  className="w-full min-h-[44px] bg-[#15803d] hover:bg-[#166534] text-white font-black py-3.5 rounded-2xl text-sm shadow-md transition disabled:opacity-50"
                 >
                   {isSubmittingTemplate ? "Saving…" : cfg.saveTemplateLabel}
                 </button>
@@ -2052,8 +2297,8 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
       {/* MODAL 2: UPLOAD FILE (Solution / Sample) */}
       {uploadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e] space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-5 sm:p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e] space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-black text-gray-900 dark:text-white">
@@ -2066,7 +2311,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
               <button
                 type="button"
                 onClick={() => setUploadModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-lg"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-lg p-1"
               >
                 ✕
               </button>
@@ -2088,7 +2333,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                 <button
                   type="button"
                   onClick={() => setUploadModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 dark:border-gray-800 dark:text-gray-300"
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 dark:border-gray-800 dark:text-gray-300"
                 >
                   Cancel
                 </button>
@@ -2096,7 +2341,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   type="button"
                   onClick={handleFileUpload}
                   disabled={isUploadingFile || !selectedFile}
-                  className="bg-[#15803d] hover:bg-[#166534] text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow transition disabled:opacity-50"
+                  className="min-h-[44px] bg-[#15803d] hover:bg-[#166534] text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow transition disabled:opacity-50"
                 >
                   {isUploadingFile ? "Uploading…" : "Upload File"}
                 </button>
@@ -2108,8 +2353,8 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
       {/* Edit Template Modal */}
       {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4">
+          <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e]">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               Edit Template Details
             </h2>
@@ -2131,7 +2376,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   placeholder={cfg.titlePlaceholder}
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white font-medium"
+                  className="mt-1 w-full min-h-[40px] rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white font-medium"
                 />
               </div>
               )}
@@ -2145,7 +2390,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   type="date"
                   value={editDueDate}
                   onChange={(e) => setEditDueDate(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white font-medium"
+                  className="mt-1 w-full min-h-[40px] rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white font-medium"
                 />
               </div>
               )}
@@ -2162,7 +2407,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                   placeholder={`e.g. ${cfg.defaultTotalMarks}`}
                   value={editTotalMarks}
                   onChange={(e) => setEditTotalMarks(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white font-medium"
+                  className="mt-1 w-full min-h-[40px] rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white font-medium"
                 />
               </div>
 
@@ -2170,14 +2415,14 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="min-h-[44px] rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingTemplate}
-                  className="bg-[#15803d] hover:bg-[#166534] text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md transition disabled:opacity-50"
+                  className="min-h-[44px] bg-[#15803d] hover:bg-[#166534] text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md transition disabled:opacity-50"
                 >
                   {isUpdatingTemplate ? "Saving..." : "Save Changes"}
                 </button>
@@ -2189,14 +2434,14 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
 
       {loadSchemeModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs"
           onClick={() => {
             if (!isApplyingLoadScheme) closeLoadSchemeModal();
           }}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e] space-y-4"
+            className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-5 sm:p-6 shadow-2xl dark:bg-[#0c181a] border border-gray-100 dark:border-[#1b2c2e] space-y-4"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
@@ -2217,7 +2462,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                 type="button"
                 disabled={isApplyingLoadScheme}
                 onClick={closeLoadSchemeModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-lg"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-lg p-1"
               >
                 ✕
               </button>
@@ -2341,7 +2586,7 @@ export default function TeacherAssignmentsScreen({ variant = "Assignment" }) {
                     selectedAssessmentIds.length === 0
                   }
                   onClick={handleApplyLoadScheme}
-                  className="w-full bg-[#15803d] hover:bg-[#166534] text-white font-black py-3.5 rounded-2xl text-sm shadow-md transition disabled:opacity-50"
+                  className="w-full min-h-[44px] bg-[#15803d] hover:bg-[#166534] text-white font-black py-3.5 rounded-2xl text-sm shadow-md transition disabled:opacity-50"
                 >
                   {isApplyingLoadScheme
                     ? "Applying…"

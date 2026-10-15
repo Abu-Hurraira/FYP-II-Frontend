@@ -108,6 +108,16 @@ export default function TeacherStudentPloResultsScreen({
     load();
   }, [load]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && selectedId) {
+        setSelectedId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedId]);
+
   const ploColumns = data?.ploColumns ?? data?.PloColumns ?? [];
   const students = data?.students ?? data?.Students ?? [];
   const warnings = data?.warnings ?? data?.Warnings ?? [];
@@ -173,15 +183,17 @@ export default function TeacherStudentPloResultsScreen({
             ) : null}
 
             <div className="flex items-start gap-4">
-            <div ref={tableWrapRef} className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
-              <table className="min-w-full text-sm">
+            <div ref={tableWrapRef} className="w-full max-w-full min-w-0 flex-1 overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+              <table className="min-w-max w-full text-sm">
                 <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:bg-[#102023] dark:text-gray-400">
                   <tr>
-                    <th className="px-3 py-3">Student</th>
+                    <th className="sticky left-0 z-20 w-44 min-w-[10.5rem] bg-gray-50 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 shadow-[2px_0_4px_rgba(0,0,0,0.06)] dark:bg-[#102023] dark:text-gray-400 sm:w-56 sm:min-w-[14rem] sm:px-4">
+                      Student
+                    </th>
                     {ploColumns.map((plo) => (
                       <th
                         key={pick(plo, "ploId", "PloId")}
-                        className="px-3 py-3 text-center cursor-help"
+                        className="min-w-[4.75rem] px-3 py-3 text-center cursor-help sm:min-w-[5.5rem]"
                         onMouseEnter={(e) =>
                           showTip(e, pick(plo, "ploCode", "PloCode"), [
                             pick(plo, "ploDescription", "PloDescription"),
@@ -194,7 +206,7 @@ export default function TeacherStudentPloResultsScreen({
                         {pick(plo, "ploCode", "PloCode")}
                       </th>
                     ))}
-                    <th className="px-3 py-3">Failed PLOs</th>
+                    <th className="min-w-[6.5rem] px-3 py-3 sm:min-w-[8rem]">Failed PLOs</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#1b2c2e]">
@@ -217,7 +229,7 @@ export default function TeacherStudentPloResultsScreen({
                           : FAIL_ROW
                         : isSelected
                           ? "bg-emerald-50 dark:bg-[#153e2e]"
-                          : "hover:bg-gray-50 dark:hover:bg-[#122225]";
+                          : "bg-white dark:bg-[#0c181a] hover:bg-gray-50 dark:hover:bg-[#122225]";
                       return (
                         <tr
                           key={id}
@@ -225,11 +237,11 @@ export default function TeacherStudentPloResultsScreen({
                           className={`cursor-pointer ${rowTone}`}
                           onClick={() => setSelectedId(id)}
                         >
-                          <td className="px-3 py-3">
-                            <p className="font-semibold text-gray-900 dark:text-white">
+                          <td className="sticky left-0 z-10 w-44 min-w-[10.5rem] bg-inherit px-3 py-3 shadow-[2px_0_4px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)] sm:w-56 sm:min-w-[14rem] sm:px-4">
+                            <p className="truncate font-semibold text-gray-900 dark:text-white" title={pick(row, "fullName", "FullName")}>
                               {pick(row, "fullName", "FullName")}
                             </p>
-                            <p className="text-xs text-gray-500">{pick(row, "aridNo", "AridNo")}</p>
+                            <p className="truncate text-xs font-mono text-gray-500">{pick(row, "aridNo", "AridNo")}</p>
                             {failedByPlo ? (
                               <p className="mt-1 text-[11px] font-bold text-red-700">Failed by PLO</p>
                             ) : null}
@@ -355,12 +367,102 @@ export default function TeacherStudentPloResultsScreen({
             </div>
 
             {selected ? (
-              <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:hidden dark:border-[#1b2c2e] dark:bg-[#0c181a]">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  {pick(selected, "fullName", "FullName")}
-                </h2>
-                <p className="text-xs text-gray-500">{pick(selected, "aridNo", "AridNo")}</p>
-              </section>
+              <div className="fixed inset-0 z-50 flex flex-col justify-end lg:hidden">
+                <div
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+                  onClick={() => setSelectedId(null)}
+                  aria-hidden="true"
+                />
+                <section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="student-detail-title"
+                  className="relative z-10 max-h-[85vh] w-full overflow-hidden rounded-t-3xl border-t border-gray-200 bg-white shadow-2xl dark:border-[#1b2c2e] dark:bg-[#0c181a]"
+                >
+                  <header className="border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-[#1b2c2e] dark:bg-[#102023]">
+                    <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Student Detail</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <h2 id="student-detail-title" className="text-lg font-black text-gray-900 dark:text-white">
+                            {pick(selected, "fullName", "FullName")}
+                          </h2>
+                          {pick(selected, "failedByPlo", "FailedByPlo") ? (
+                            <span className="rounded-full bg-red-200 px-2.5 py-0.5 text-xs font-bold text-red-800">
+                              Failed by PLO
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                              Passed
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-xs font-mono font-medium text-gray-500">{pick(selected, "aridNo", "AridNo")}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(null)}
+                        className="rounded-full p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                        aria-label="Close details"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </header>
+
+                  <div className="max-h-[calc(85vh-90px)] space-y-3 overflow-y-auto p-5 pb-8">
+                    {pick(selected, "passAdvice", "PassAdvice") ? (
+                      <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold leading-relaxed text-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                        {pick(selected, "passAdvice", "PassAdvice")}
+                      </p>
+                    ) : null}
+                    {(selected.plos ?? selected.Plos ?? []).map((plo) => {
+                      const detail = plo.detail ?? plo.Detail ?? [];
+                      const failedPlo = Boolean(pick(plo, "failed", "Failed"));
+                      return (
+                        <div
+                          key={pick(plo, "ploId", "PloId")}
+                          className={`rounded-2xl border p-4 ${
+                            failedPlo
+                              ? "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20"
+                              : "border-gray-100 bg-gray-50 dark:border-[#1b2c2e] dark:bg-[#102023]"
+                          }`}
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <h3 className="text-sm font-black text-gray-900 dark:text-white">
+                              {pick(plo, "ploCode", "PloCode")}
+                            </h3>
+                            <p className={`text-sm font-bold ${failedPlo ? "text-red-600" : "text-emerald-700"}`}>
+                              {formatPct(pick(plo, "percent", "Percent"))}
+                              {failedPlo ? " · Fail" : pick(plo, "percent", "Percent") != null ? " · Pass" : ""}
+                            </p>
+                          </div>
+                          <ul className="mt-3 space-y-1.5 border-t border-gray-200/60 pt-2.5 dark:border-gray-800">
+                            {detail.length === 0 ? (
+                              <li className="text-xs text-gray-500">No CLO marks mapped to this PLO.</li>
+                            ) : (
+                              detail.map((item) => (
+                                <li
+                                  key={`${pick(item, "cloId", "CloId")}-${pick(item, "label", "Label")}`}
+                                  className="flex items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200"
+                                >
+                                  <span>{pick(item, "label", "Label") || pick(item, "cloCode", "CloCode")}</span>
+                                  <span className="font-mono">
+                                    {formatMarks(pick(item, "obtained", "Obtained"), pick(item, "maximum", "Maximum"))}
+                                  </span>
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              </div>
             ) : null}
             <HoverCard tip={hoverTip} />
           </>

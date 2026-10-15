@@ -8,11 +8,13 @@ import {
   updateProgram,
 } from "../../api/programsApi";
 import { getSessions } from "../../api/sessionsApi";
+import { useHodProgram } from "../../context/HodProgramContext.jsx";
 import HodMintHeader from "../../components/HodMintHeader.jsx";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 
 export default function HodProgramsScreen() {
   const navigate = useNavigate();
+  const { setSelectedProgramId, refreshPrograms } = useHodProgram();
 
   const [programs, setPrograms] = useState([]);
   const [sessionCounts, setSessionCounts] = useState({});
@@ -86,6 +88,7 @@ export default function HodProgramsScreen() {
       setProgramName("");
       setProgramCode("");
       await loadPrograms();
+      await refreshPrograms().catch(() => {});
     } catch (error) {
       showAlert("Error", error.message);
     }
@@ -104,6 +107,7 @@ export default function HodProgramsScreen() {
       await deleteProgram(item.programId ?? item.ProgramId);
       showAlert("Deleted", "Program deleted.");
       await loadPrograms();
+      await refreshPrograms().catch(() => {});
     } catch (error) {
       showAlert("Error", error.message);
     }
@@ -126,7 +130,9 @@ export default function HodProgramsScreen() {
   }, [programs, search]);
 
   const openProgram = (item) => {
-    navigate(`/hod/program/${item.programId ?? item.ProgramId}/menu`, {
+    const id = item.programId ?? item.ProgramId;
+    setSelectedProgramId(id);
+    navigate(`/hod/program/${id}/menu`, {
       state: { program: item },
     });
   };
@@ -257,31 +263,31 @@ export default function HodProgramsScreen() {
 
       {modalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               {editing ? "Edit Program" : "Add Program"}
             </h2>
-            <label className="mb-3 block text-sm font-semibold text-gray-700">
+            <label className="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Program name
               <input
-                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                className="mt-1 min-h-[40px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. BS Computer Science"
                 value={programName}
                 onChange={(e) => setProgramName(e.target.value)}
               />
             </label>
-            <label className="mb-4 block text-sm font-semibold text-gray-700">
+            <label className="mb-4 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Program code
               <input
-                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 placeholder:text-gray-400"
+                className="mt-1 min-h-[40px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. BSCS"
                 value={programCode}
                 onChange={(e) => setProgramCode(e.target.value)}
@@ -290,14 +296,14 @@ export default function HodProgramsScreen() {
             <button
               type="button"
               onClick={handleSaveProgram}
-              className="app-btn-primary w-full py-3"
+              className="app-btn-primary min-h-[44px] w-full py-3"
             >
               Save
             </button>
             <button
               type="button"
               onClick={() => setModalVisible(false)}
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
             >
               Cancel
             </button>

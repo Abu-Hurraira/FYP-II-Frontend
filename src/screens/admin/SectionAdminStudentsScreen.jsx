@@ -336,24 +336,24 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
       </div>
 
       {choiceVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setChoiceVisible(false)} role="presentation">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900">Add students</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setChoiceVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">Add students</h2>
             <button
               type="button"
               onClick={() => {
                 setChoiceVisible(false);
                 setUploadVisible(true);
               }}
-              className="mb-3 w-full rounded-lg py-3 font-black text-white"
+              className="mb-3 min-h-[44px] w-full rounded-xl py-3 font-black text-white"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Upload Student List
             </button>
-            <button type="button" onClick={openAdd} className="w-full rounded-lg py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
+            <button type="button" onClick={openAdd} className="min-h-[44px] w-full rounded-xl py-3 font-black text-white" style={{ backgroundColor: theme.colors.primaryDark }}>
               Add Student
             </button>
-            <button type="button" onClick={() => setChoiceVisible(false)} className="mt-4 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setChoiceVisible(false)} className="mt-4 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -361,35 +361,35 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
       )}
 
       {uploadVisible && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-4" onClick={() => setUploadVisible(false)} role="presentation">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-2 text-center text-lg font-semibold text-gray-900">Upload student list</h2>
-            <p className="mb-4 text-center text-sm text-gray-500">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setUploadVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-2 text-center text-lg font-semibold text-gray-900 dark:text-white">Upload student list</h2>
+            <p className="mb-4 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
               Upload inside the section you opened. The <strong>Section</strong> column in the file is ignored — students are added to {currentSectionName || "this section"}.
             </p>
 
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-extrabold uppercase tracking-wide text-gray-600">Supported columns</p>
-              <p className="mt-1 text-xs text-gray-500">
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-[#1b2c2e] dark:bg-[#122427]">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-gray-600 dark:text-gray-300">Supported columns</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 <strong>StuName</strong> (or Full Name), <strong>Reg_no</strong> (or ARID / Ardi Number), and <strong>Email</strong> (optional)
               </p>
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[320px] border-collapse text-left text-xs">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="py-1.5 pr-2 font-semibold text-gray-700">Section</th>
-                      <th className="py-1.5 pr-2 font-semibold text-gray-700">StuName</th>
-                      <th className="py-1.5 pr-2 font-semibold text-gray-700">Reg_no</th>
-                      <th className="py-1.5 font-semibold text-gray-700">Email</th>
+                    <tr className="border-b border-gray-200 dark:border-[#1b2c2e]">
+                      <th className="py-1.5 pr-2 font-semibold text-gray-700 dark:text-gray-300">Section</th>
+                      <th className="py-1.5 pr-2 font-semibold text-gray-700 dark:text-gray-300">StuName</th>
+                      <th className="py-1.5 pr-2 font-semibold text-gray-700 dark:text-gray-300">Reg_no</th>
+                      <th className="py-1.5 pr-2 font-semibold text-gray-700 dark:text-gray-300">Email</th>
                     </tr>
                   </thead>
                   <tbody>
                     {STUDENT_IMPORT_SAMPLE_ROWS.map((row) => (
-                      <tr key={row.Reg_no} className="border-b border-gray-100 last:border-b-0">
-                        <td className="py-1.5 pr-2 text-gray-600">{row.Section}</td>
-                        <td className="py-1.5 pr-2 text-gray-800">{row.StuName}</td>
-                        <td className="py-1.5 pr-2 text-gray-800">{row.Reg_no}</td>
-                        <td className="py-1.5 text-gray-600">{row.Email}</td>
+                      <tr key={row.Reg_no} className="border-b border-gray-100 last:border-b-0 dark:border-[#1b2c2e]">
+                        <td className="py-1.5 pr-2 text-gray-600 dark:text-gray-400">{row.Section}</td>
+                        <td className="py-1.5 pr-2 text-gray-800 dark:text-gray-200 font-medium">{row.StuName}</td>
+                        <td className="py-1.5 pr-2 text-gray-800 dark:text-gray-200 font-mono">{row.Reg_no}</td>
+                        <td className="py-1.5 text-gray-600 dark:text-gray-400">{row.Email}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -397,7 +397,7 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
               </div>
             </div>
 
-            <label className="flex h-12 cursor-pointer items-center rounded-lg bg-gray-100 px-3">
+            <label className="flex min-h-[44px] cursor-pointer items-center rounded-lg bg-gray-100 px-3 text-sm text-gray-700 dark:bg-[#122427] dark:text-gray-300">
               <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               {selectedFile ? selectedFile.name : "Select .xlsx file"}
             </label>
@@ -405,12 +405,12 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
               type="button"
               disabled={uploading}
               onClick={uploadStudents}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               {uploading ? "…" : "Save"}
             </button>
-            <button type="button" onClick={() => setUploadVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setUploadVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -418,15 +418,15 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
       )}
 
       {formVisible && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-4" onClick={() => setFormVisible(false)} role="presentation">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 p-3 sm:p-4 backdrop-blur-xs" onClick={() => setFormVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">
               {editingStudent ? "Edit student" : "Add student"}
             </h2>
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Section <span className="text-red-600">*</span>
               <AppSelect
-                className="mt-1 w-full"
+                className="mt-1 w-full min-h-[40px]"
                 value={formSectionId}
                 onChange={(e) => setFormSectionId(e.target.value)}
               >
@@ -441,28 +441,28 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
                 })}
               </AppSelect>
             </label>
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Name <span className="text-red-600">*</span>
               <input
-                className="mt-1 w-full rounded-lg border px-3 py-2 font-normal text-gray-900"
+                className="mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-normal text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. Ali Khan"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
             </label>
-            <label className="mb-3 block text-xs font-extrabold text-gray-600">
+            <label className="mb-3 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               ID / Registration <span className="text-red-600">*</span>
               <input
-                className="mt-1 w-full rounded-lg border px-3 py-2 font-normal text-gray-900"
+                className="mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-normal text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. 23-Arid-0000"
                 value={aridNo}
                 onChange={(e) => setAridNo(e.target.value)}
               />
             </label>
-            <label className="mb-4 block text-xs font-extrabold text-gray-600">
+            <label className="mb-4 block text-xs font-extrabold text-gray-600 dark:text-gray-300">
               Email
               <input
-                className="mt-1 w-full rounded-lg border px-3 py-2 font-normal text-gray-900"
+                className="mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-normal text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="e.g. ali@biit.edu.pk (optional)"
                 type="email"
                 value={email}
@@ -473,12 +473,12 @@ Errors: ${result.errorCount ?? errors.length ?? 0}${errorPreview}${warningPrevie
               type="button"
               disabled={saving}
               onClick={saveStudent}
-              className="w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               {saving ? "Saving…" : editingStudent ? "Save" : "Add"}
             </button>
-            <button type="button" onClick={() => setFormVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setFormVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>

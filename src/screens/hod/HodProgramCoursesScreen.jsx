@@ -378,19 +378,19 @@ Skipped: ${result.skippedCount ?? 0}`
 
       {actionVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setActionVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Add to program</h2>
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">Add to program</h2>
             <button
               type="button"
-              className="app-btn-primary mb-3 w-full py-3"
+              className="app-btn-primary mb-3 min-h-[44px] w-full py-3 font-extrabold"
               onClick={() => {
                 setActionVisible(false);
                 setExistingVisible(true);
@@ -400,7 +400,7 @@ Skipped: ${result.skippedCount ?? 0}`
             </button>
             <button
               type="button"
-              className="app-btn-primary mb-3 w-full py-3"
+              className="app-btn-primary mb-3 min-h-[44px] w-full py-3 font-extrabold"
               onClick={() => {
                 setActionVisible(false);
                 resetForm();
@@ -411,7 +411,7 @@ Skipped: ${result.skippedCount ?? 0}`
             </button>
             <button
               type="button"
-              className="app-btn-primary mb-3 w-full py-3"
+              className="app-btn-primary mb-3 min-h-[44px] w-full py-3 font-extrabold"
               onClick={() => {
                 setActionVisible(false);
                 setUploadVisible(true);
@@ -421,7 +421,7 @@ Skipped: ${result.skippedCount ?? 0}`
             </button>
             <button
               type="button"
-              className="app-btn-primary mb-3 w-full py-3"
+              className="app-btn-primary mb-3 min-h-[44px] w-full py-3 font-extrabold"
               disabled={saving}
               onClick={handleLoadFromCatalog}
             >
@@ -429,7 +429,7 @@ Skipped: ${result.skippedCount ?? 0}`
             </button>
             <button
               type="button"
-              className="w-full font-bold text-gray-500"
+              className="min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
               onClick={() => setActionVisible(false)}
             >
               Cancel
@@ -440,46 +440,46 @@ Skipped: ${result.skippedCount ?? 0}`
 
       {existingVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setExistingVisible(false)}
           role="presentation"
         >
           <div
-            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-2 text-lg font-semibold text-gray-900">Courses already in the system</h2>
-            <p className="mb-4 text-sm text-gray-500">
+            <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Courses already in the system</h2>
+            <p className="mb-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
               These are from the Courses page. Add them to {program.programName}.
             </p>
             <button
               type="button"
               disabled={saving || unlinkedCourses.length === 0}
-              className="app-btn-primary mb-4 w-full py-3 disabled:opacity-50"
+              className="app-btn-primary mb-4 min-h-[44px] w-full py-3 disabled:opacity-50 font-extrabold"
               onClick={handleLinkAllExisting}
             >
               {saving ? "Adding…" : `Add all (${unlinkedCourses.length})`}
             </button>
             {unlinkedCourses.length === 0 ? (
-              <p className="text-sm font-semibold text-gray-500">All master courses are already in this program.</p>
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">All master courses are already in this program.</p>
             ) : (
               <div className="space-y-2">
                 {unlinkedCourses.map((course) => (
                   <div
                     key={courseIdOf(course)}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-3 dark:border-[#1b2c2e] dark:bg-[#122427]"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">
+                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                         {course.courseTitle || course.CourseTitle}
                       </p>
-                      <p className="text-xs text-gray-500">{course.courseCode || course.CourseCode}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{course.courseCode || course.CourseCode}</p>
                     </div>
                     <button
                       type="button"
                       disabled={saving}
-                      className="shrink-0 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-extrabold text-emerald-800 disabled:opacity-50"
+                      className="shrink-0 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-extrabold text-emerald-800 disabled:opacity-50 dark:bg-emerald-950 dark:text-emerald-300"
                       onClick={() => handleLinkOne(course)}
                     >
                       Add
@@ -490,7 +490,7 @@ Skipped: ${result.skippedCount ?? 0}`
             )}
             <button
               type="button"
-              className="mt-4 w-full font-bold text-gray-500"
+              className="mt-4 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
               onClick={() => setExistingVisible(false)}
             >
               Close
@@ -501,7 +501,7 @@ Skipped: ${result.skippedCount ?? 0}`
 
       {formVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => {
             setFormVisible(false);
             resetForm();
@@ -509,38 +509,38 @@ Skipped: ${result.skippedCount ?? 0}`
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               {editingCourse ? "Edit Course" : "New Course"}
             </h2>
-            <label className="text-sm font-extrabold">Course Title</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Course Title</label>
             <input
-              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. Applied Physics"
               value={courseTitle}
               onChange={(e) => setCourseTitle(e.target.value)}
             />
-            <label className="text-sm font-extrabold">Course Code</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Course Code</label>
             <input
-              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. PHY-101"
               value={courseCode}
               onChange={(e) => setCourseCode(e.target.value)}
             />
-            <label className="text-sm font-extrabold">Class Credit Hours</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Class Credit Hours</label>
             <input
-              className="mb-3 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400"
+              className="mb-3 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. 3"
               value={classCreditHours}
               onChange={(e) => setClassCreditHours(e.target.value)}
               inputMode="numeric"
             />
-            <label className="text-sm font-extrabold">Lab Credit Hours</label>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">Lab Credit Hours</label>
             <input
-              className="mb-4 mt-1 w-full rounded-lg border bg-white px-3 py-2 placeholder:text-gray-400"
+              className="mb-4 mt-1 min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. 1"
               value={labCreditHours}
               onChange={(e) => setLabCreditHours(e.target.value)}
@@ -549,14 +549,14 @@ Skipped: ${result.skippedCount ?? 0}`
             <button
               type="button"
               disabled={saving}
-              className="app-btn-primary w-full py-3 disabled:opacity-50"
+              className="app-btn-primary min-h-[44px] w-full py-3 font-extrabold disabled:opacity-50"
               onClick={handleSaveCourse}
             >
               {saving ? "Saving…" : "Save"}
             </button>
             <button
               type="button"
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
               onClick={() => {
                 setFormVisible(false);
                 resetForm();
@@ -570,24 +570,24 @@ Skipped: ${result.skippedCount ?? 0}`
 
       {uploadVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setUploadVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Upload catalog file</h2>
-            <label className="flex h-11 cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Upload catalog file</h2>
+            <label className="flex min-h-[44px] cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600 dark:bg-[#122427] dark:text-gray-300">
               <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               {selectedFile ? selectedFile.name : "Browse"}
             </label>
             <button
               type="button"
               disabled={uploading}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
               style={{ backgroundColor: theme.colors.primaryDark }}
               onClick={handleImport}
             >
@@ -595,7 +595,7 @@ Skipped: ${result.skippedCount ?? 0}`
             </button>
             <button
               type="button"
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
               onClick={() => setUploadVisible(false)}
             >
               Cancel
@@ -606,19 +606,19 @@ Skipped: ${result.skippedCount ?? 0}`
 
       {catalogModalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setCatalogModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-2 text-lg font-semibold text-gray-900">Choose course catalog version</h2>
-            <p className="mb-4 text-sm text-gray-500">Multiple saved catalogs found. Pick which one to apply.</p>
+            <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Choose course catalog version</h2>
+            <p className="mb-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Multiple saved catalogs found. Pick which one to apply.</p>
             <select
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              className="min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               value={selectedCatalogVersionId}
               onChange={(e) => setSelectedCatalogVersionId(e.target.value)}
             >
@@ -637,7 +637,7 @@ Skipped: ${result.skippedCount ?? 0}`
             <button
               type="button"
               disabled={restoringCatalog}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
               style={{ backgroundColor: theme.colors.primaryDark }}
               onClick={handleApplySelectedCourseCatalog}
             >
@@ -645,7 +645,7 @@ Skipped: ${result.skippedCount ?? 0}`
             </button>
             <button
               type="button"
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
               onClick={() => setCatalogModalVisible(false)}
             >
               Cancel

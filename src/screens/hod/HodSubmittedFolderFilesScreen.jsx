@@ -20,26 +20,39 @@ export default function HodSubmittedFolderFilesScreen() {
   const folder = location.state?.folder;
   const courseTitle = location.state?.courseTitle;
 
+  const [activeFolder, setActiveFolder] = useState(folder || null);
+  const [childFolders, setChildFolders] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
 
+  useEffect(() => {
+    setActiveFolder(folder || { directoryId: Number(directoryId) });
+  }, [folder, directoryId]);
+
   const loadFiles = useCallback(async () => {
-    const id = folder?.directoryId ?? folder?.DirectoryId ?? Number(directoryId);
+    const id = activeFolder?.directoryId ?? activeFolder?.DirectoryId ?? Number(directoryId);
     if (!id || !offeredCourseId) {
       setLoading(false);
       return;
     }
 
     try {
+      setLoading(true);
       const result = await getHodSubmittedFolderFiles(offeredCourseId, id);
-      setFiles(Array.isArray(result) ? result : []);
+      if (Array.isArray(result)) {
+        setFiles(result);
+        setChildFolders([]);
+      } else {
+        setFiles(result?.files ?? result?.Files ?? []);
+        setChildFolders(result?.folders ?? result?.Folders ?? []);
+      }
     } catch (error) {
       showAlert("Error", error.message);
     } finally {
       setLoading(false);
     }
-  }, [folder?.directoryId, folder?.DirectoryId, directoryId, offeredCourseId]);
+  }, [activeFolder?.directoryId, activeFolder?.DirectoryId, directoryId, offeredCourseId]);
 
   useEffect(() => {
     loadFiles();
@@ -75,12 +88,27 @@ export default function HodSubmittedFolderFilesScreen() {
     return Object.entries(grouped);
   }, [files]);
 
-  const folderName = folderDisplayName(folder) || "Folder section";
+  const rootFolder = folder || { directoryId: Number(directoryId) };
+  const isNested =
+    Boolean(activeFolder) &&
+    (activeFolder.directoryId ?? activeFolder.DirectoryId) !==
+      (rootFolder.directoryId ?? rootFolder.DirectoryId);
+  const folderName = folderDisplayName(activeFolder || rootFolder) || "Folder section";
 
   return (
     <div className="min-h-full bg-page">
       <div className="flex flex-wrap items-start gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8">
-        <PageBackButton className="mt-0.5" />
+        {isNested ? (
+          <button
+            type="button"
+            onClick={() => setActiveFolder(rootFolder)}
+            className="mt-0.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            ← Back
+          </button>
+        ) : (
+          <PageBackButton className="mt-0.5" />
+        )}
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold text-gray-900">{folderName}</h1>
           {courseTitle ? <p className="mt-0.5 text-xs text-gray-500">{courseTitle} · Read only</p> : null}
@@ -98,6 +126,26 @@ export default function HodSubmittedFolderFilesScreen() {
               className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-transparent"
               style={{ borderTopColor: theme.colors.primary }}
             />
+          </div>
+        ) : childFolders.length > 0 ? (
+          <div className="space-y-2.5">
+            {childFolders.map((child) => {
+              const count = child.fileCount ?? child.FileCount ?? 0;
+              return (
+                <button
+                  key={child.directoryId ?? child.DirectoryId}
+                  type="button"
+                  onClick={() => setActiveFolder(child)}
+                  className="flex w-full min-h-[48px] items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 text-left shadow-card shadow-sm transition hover:bg-brand-muted/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900">{folderDisplayName(child)}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">{count} file(s)</p>
+                  </div>
+                  <span className="shrink-0 text-xl text-gray-300">›</span>
+                </button>
+              );
+            })}
           </div>
         ) : files.length === 0 ? (
           <p className="py-12 text-center text-sm text-gray-500">No files in this section.</p>

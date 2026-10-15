@@ -224,17 +224,17 @@ export default function HodPeoPloMappingScreen() {
             <p className="mt-2 text-sm text-gray-500">Add PLOs under Program → PLOs first.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white dark:bg-[#0c181a] dark:border-white/10 shadow-card">
             <table className="min-w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="sticky left-0 z-20 min-w-[180px] border-r border-gray-200 bg-gray-50 px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600">
+                <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#102023]">
+                  <th className="sticky left-0 z-20 min-w-[180px] border-r border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#102023] px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">
                     PLO
                   </th>
                   {sortedPeos.map((peo, peoIndex) => (
                     <th
                       key={peo.peoId}
-                      className="min-w-[72px] max-w-[120px] px-2 py-3 text-center text-xs font-semibold text-gray-700"
+                      className="min-w-[72px] max-w-[120px] px-2 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300"
                       title={peo.peoDescription || ""}
                     >
                       {peoDisplayLabel(peo, peoIndex)}
@@ -246,10 +246,10 @@ export default function HodPeoPloMappingScreen() {
               <tbody>
                 {sortedPlos.map((plo, ploIndex) => {
                   return (
-                    <tr key={plo.ploId} className="border-b border-gray-100 hover:bg-brand-muted/40/80">
-                      <td className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-3">
-                        <p className="font-semibold text-gray-900">{ploDisplayLabel(plo, ploIndex)}</p>
-                        {plo.ploCode ? <p className="text-xs text-gray-500">{plo.ploCode}</p> : null}
+                    <tr key={plo.ploId} className="border-b border-gray-100 dark:border-white/5 hover:bg-brand-muted/40/80">
+                      <td className="sticky left-0 z-10 border-r border-gray-200 dark:border-white/10 bg-white dark:bg-[#0c181a] px-3 py-3">
+                        <p className="font-semibold text-gray-900 dark:text-white">{ploDisplayLabel(plo, ploIndex)}</p>
+                        {plo.ploCode ? <p className="text-xs text-gray-500 dark:text-gray-400">{plo.ploCode}</p> : null}
                       </td>
 
                       {sortedPeos.map((peo, peoIndex) => {

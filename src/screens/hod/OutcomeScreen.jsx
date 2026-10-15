@@ -394,19 +394,19 @@ const OutcomeScreen = ({
 
       {actionModalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setActionModalVisible(false)}
           role="presentation"
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900">{type}s</h2>
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">{type}s</h2>
             <button
               type="button"
               onClick={() => {
                 setActionModalVisible(false);
                 setUploadModalVisible(true);
               }}
-              className="mb-3 w-full rounded-lg py-3 font-black text-white"
+              className="mb-3 min-h-[44px] w-full rounded-xl py-3 font-black text-white"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Upload {type}s from file
@@ -414,7 +414,7 @@ const OutcomeScreen = ({
             <button
               type="button"
               onClick={handleLoadFromDatabase}
-              className="mb-3 w-full rounded-lg py-3 font-black text-white"
+              className="mb-3 min-h-[44px] w-full rounded-xl py-3 font-black text-white"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Load {type}s from Database
@@ -422,12 +422,12 @@ const OutcomeScreen = ({
             <button
               type="button"
               onClick={openNewForm}
-              className="w-full rounded-lg py-3 font-black text-white"
+              className="min-h-[44px] w-full rounded-xl py-3 font-black text-white"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Add New {type}
             </button>
-            <button type="button" onClick={() => setActionModalVisible(false)} className="mt-4 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setActionModalVisible(false)} className="mt-4 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -435,12 +435,12 @@ const OutcomeScreen = ({
       )}
 
       {formModalVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6" onClick={() => setFormModalVisible(false)} role="presentation">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">{editingItem ? `Edit ${type}` : `New ${type}`}</h2>
-            <label className="text-sm font-extrabold text-gray-700">{editingItem ? `Edit ${type}` : `Enter ${type}`}</label>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs" onClick={() => setFormModalVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{editingItem ? `Edit ${type}` : `New ${type}`}</h2>
+            <label className="text-sm font-extrabold text-gray-700 dark:text-gray-300">{editingItem ? `Edit ${type}` : `Enter ${type}`}</label>
             <textarea
-              className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3"
+              className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               placeholder="e.g. The ability to think critically and perform scientific analysis."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -448,12 +448,12 @@ const OutcomeScreen = ({
             <button
               type="button"
               onClick={handleSave}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white"
+              className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               Save
             </button>
-            <button type="button" onClick={() => setFormModalVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setFormModalVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -461,10 +461,10 @@ const OutcomeScreen = ({
       )}
 
       {uploadModalVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6" onClick={() => setUploadModalVisible(false)} role="presentation">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()} role="presentation">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Upload New {type}s file</h2>
-            <label className="flex h-11 cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs" onClick={() => setUploadModalVisible(false)} role="presentation">
+          <div className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white" onClick={(e) => e.stopPropagation()} role="presentation">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Upload New {type}s file</h2>
+            <label className="flex min-h-[44px] cursor-pointer items-center rounded-lg bg-gray-100 px-3 font-bold text-gray-600 dark:bg-[#122427] dark:text-gray-300">
               <input type="file" accept=".xlsx" className="hidden" onChange={pickFile} />
               {selectedFile ? selectedFile.name : "Browse"}
             </label>
@@ -472,12 +472,12 @@ const OutcomeScreen = ({
               type="button"
               onClick={handleImport}
               disabled={uploading}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               {uploading ? "…" : "Upload"}
             </button>
-            <button type="button" onClick={() => setUploadModalVisible(false)} className="mt-3 w-full font-bold text-gray-500">
+            <button type="button" onClick={() => setUploadModalVisible(false)} className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
             </button>
           </div>
@@ -486,19 +486,19 @@ const OutcomeScreen = ({
 
       {catalogModalVisible && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={() => setCatalogModalVisible(false)}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="mb-2 text-lg font-semibold text-gray-900">Choose {type} catalog version</h2>
-            <p className="mb-4 text-sm text-gray-500">Multiple saved Excel catalogs found. Pick which one to apply.</p>
+            <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Choose {type} catalog version</h2>
+            <p className="mb-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Multiple saved Excel catalogs found. Pick which one to apply.</p>
             <select
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              className="min-h-[40px] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
               value={selectedCatalogVersionId}
               onChange={(e) => setSelectedCatalogVersionId(e.target.value)}
             >
@@ -521,7 +521,7 @@ const OutcomeScreen = ({
               type="button"
               onClick={handleApplySelectedCatalog}
               disabled={restoringCatalog}
-              className="mt-4 w-full rounded-lg py-3 font-black text-white disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-xl py-3 font-black text-white disabled:opacity-60"
               style={{ backgroundColor: theme.colors.primaryDark }}
             >
               {restoringCatalog ? "Applying…" : "Apply catalog"}

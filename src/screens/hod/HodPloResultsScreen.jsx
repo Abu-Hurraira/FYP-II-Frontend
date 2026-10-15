@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import { useHodProgram } from "../../context/HodProgramContext.jsx";
 import TeacherStudentPloResultsScreen from "../teacher/TeacherStudentPloResultsScreen.jsx";
 import { getHodDashboardCoursesPage } from "../../api/hodApi";
 import { getCourseResults } from "../../api/courseResultsApi";
@@ -17,7 +18,7 @@ function courseLabel(course) {
   return [code && title ? `${code} ${title}` : title, section, teacher].filter(Boolean).join(" · ");
 }
 
-async function loadAllCourses(hodUserId) {
+async function loadAllCourses(hodUserId, programId) {
   const all = [];
   let page = 1;
   let hasMore = true;
@@ -27,6 +28,7 @@ async function loadAllCourses(hodUserId) {
       pageSize: 48,
       lite: true,
       hodUserId,
+      programId,
     });
     all.push(...(data.items || []));
     hasMore = Boolean(data.hasMore);
@@ -37,6 +39,7 @@ async function loadAllCourses(hodUserId) {
 
 export default function HodPloResultsScreen() {
   const { user } = useContext(AuthContext);
+  const { selectedProgramId, selectedProgram } = useHodProgram();
   const hodUserId = getAuthUserId(user);
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
@@ -47,13 +50,18 @@ export default function HodPloResultsScreen() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!hodUserId) {
+    if (!hodUserId || !selectedProgramId) {
+      setCourses([]);
+      setSelectedId("");
       setLoadingCourses(false);
       return undefined;
     }
     let cancelled = false;
     setLoadingCourses(true);
-    loadAllCourses(hodUserId)
+    setSelectedId("");
+    setCompiled(false);
+    setNotice("");
+    loadAllCourses(hodUserId, selectedProgramId)
       .then((items) => {
         if (!cancelled) setCourses(items);
       })
@@ -66,7 +74,7 @@ export default function HodPloResultsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [hodUserId]);
+  }, [hodUserId, selectedProgramId]);
 
   const options = useMemo(() => {
     const sorted = [...courses].sort((a, b) =>
@@ -111,7 +119,11 @@ export default function HodPloResultsScreen() {
     <div className="min-h-full bg-page pb-12">
       <HodMintHeader
         title="PLO Results"
-        subtitle="Search a course, then open student PLO results after the result is compiled."
+        subtitle={
+          selectedProgram
+            ? `PLO results for ${selectedProgram.programCode || selectedProgram.programName}. Search a course after results are compiled.`
+            : "Select a program from the top bar to view PLO results."
+        }
       />
 
       <div className="w-full space-y-4 px-4 pt-4 sm:px-6 lg:px-8">

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getHodSubmittedFolders } from "../../api/hodApi";
 import { approveSubmittedFolder, rejectSubmittedFolder, unlockSubmittedFolder } from "../../api/hodFolderReviewApi";
 import { AuthContext } from "../../context/AuthContext.jsx";
+import { useHodProgram } from "../../context/HodProgramContext.jsx";
 import theme from "../../styles/theme";
 import { showAlert, showConfirm } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
@@ -14,6 +15,7 @@ function isApprovedFolder(item) {
 
 export default function HodSubmittedFoldersScreen() {
   const { user } = useContext(AuthContext);
+  const { selectedProgramId, selectedProgram } = useHodProgram();
   const hodUserId = getAuthUserId(user);
   const navigate = useNavigate();
   const [folders, setFolders] = useState([]);
@@ -25,11 +27,11 @@ export default function HodSubmittedFoldersScreen() {
   const loadFolders = useCallback(async () => {
     try {
       setLoading(true);
-      if (!hodUserId) {
+      if (!hodUserId || !selectedProgramId) {
         setFolders([]);
         return;
       }
-      const data = await getHodSubmittedFolders(hodUserId);
+      const data = await getHodSubmittedFolders(hodUserId, { programId: selectedProgramId });
       setFolders(Array.isArray(data) ? data : []);
     } catch (error) {
       setFolders([]);
@@ -37,7 +39,7 @@ export default function HodSubmittedFoldersScreen() {
     } finally {
       setLoading(false);
     }
-  }, [hodUserId]);
+  }, [hodUserId, selectedProgramId]);
 
   useEffect(() => {
     loadFolders();
@@ -109,7 +111,11 @@ export default function HodSubmittedFoldersScreen() {
     <div className="min-h-full bg-page">
       <HodMintHeader
         title="Submitted Folders"
-        subtitle="Review and view submitted folders."
+        subtitle={
+          selectedProgram
+            ? `Review submitted folders for ${selectedProgram.programCode || selectedProgram.programName}.`
+            : "Select a program from the top bar to review submitted folders."
+        }
       />
 
       <div className="w-full px-4 pb-10 pt-4 sm:px-6 lg:px-8">
@@ -219,29 +225,29 @@ export default function HodSubmittedFoldersScreen() {
 
       {rejectTarget ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-6 backdrop-blur-xs"
           onClick={closeRejectDialog}
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-xl dark:bg-[#0c181a] dark:text-white"
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h2 className="text-lg font-semibold text-gray-900">Review</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Review</h2>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
               {[rejectTarget.courseTitle, rejectTarget.sectionName].filter(Boolean).join(" · ")}
             </p>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               The folder will be unlocked. Your reason will show on the teacher’s folder page.
             </p>
 
-            <label className="mt-4 block text-sm font-semibold text-gray-700">
+            <label className="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Reason
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal"
+                className="mt-2 min-h-[110px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-normal text-gray-900 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-white"
                 placeholder="Write why you are rejecting this…"
                 autoFocus
               />
@@ -251,14 +257,14 @@ export default function HodSubmittedFoldersScreen() {
               type="button"
               onClick={handleRejectSubmit}
               disabled={actionId === rejectTarget.offeredCourseId}
-              className="mt-4 w-full rounded-lg bg-red-600 py-3 font-bold text-white hover:bg-red-700 disabled:opacity-60"
+              className="mt-4 min-h-[44px] w-full rounded-xl bg-red-600 py-3 font-bold text-white hover:bg-red-700 disabled:opacity-60"
             >
               {actionId === rejectTarget.offeredCourseId ? "Rejecting…" : "Submit Rejection"}
             </button>
             <button
               type="button"
               onClick={closeRejectDialog}
-              className="mt-3 w-full font-bold text-gray-500"
+              className="mt-3 min-h-[44px] w-full font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
             >
               Cancel
             </button>

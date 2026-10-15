@@ -5,6 +5,7 @@ import { getAttendanceSheet, importAttendanceSheet, updateAttendanceSheet } from
 import { getTeacherCoursesPage } from "../../api/teacherApi";
 import { getGraderTasksMine } from "../../api/graderTasksApi";
 import AppSelect from "../../components/AppSelect.jsx";
+import PageBackButton from "../../components/PageBackButton.jsx";
 import { showAlert } from "../../utils/dialogs";
 import { getAuthUserId } from "../../utils/helpers";
 import theme from "../../styles/theme";
@@ -16,9 +17,9 @@ const STATUS_OPTIONS = [
   { value: "Leave", label: "L" },
 ];
 
-const ARID_COL = "10.5rem";
-const NAME_COL = "13rem";
-const DATE_COL = "4.75rem";
+const ARID_COL = "var(--arid-col-w, 10.5rem)";
+const NAME_COL = "var(--name-col-w, 13rem)";
+const DATE_COL = "var(--date-col-w, 4.75rem)";
 
 function statusClass(status) {
   if (status === "Present") return "bg-emerald-50 text-emerald-800";
@@ -223,7 +224,7 @@ export default function TeacherAttendanceScreen() {
       const updated = await updateAttendanceSheet(offeredCourseId, teacherUserId, updates);
       setSheet(updated);
       setDraft({});
-      showAlert("Saved", "Attendance updated.");
+      showAlert("Saved", "Attendance updated and Excel saved to folder e-Attendance Record.");
     } catch (error) {
       showAlert("Save Error", error.message);
     } finally {
@@ -237,11 +238,14 @@ export default function TeacherAttendanceScreen() {
 
   return (
     <div className="min-h-full bg-page">
-      <div className="border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8 dark:border-[#1b2c2e] dark:bg-[#071113]">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Attendance</h1>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-          Upload a sheet, then edit Present / Absent on this page.
-        </p>
+      <div className="flex flex-wrap items-start gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-6 lg:px-8 dark:border-[#1b2c2e] dark:bg-[#071113]">
+        <PageBackButton className="mt-0.5" />
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Attendance</h1>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            Upload a sheet, mark Present / Absent, then Save — Excel goes to submitted folder e-Attendance Record.
+          </p>
+        </div>
       </div>
 
       <div className="px-4 pb-10 pt-4 sm:px-6 lg:px-8">
@@ -339,17 +343,17 @@ export default function TeacherAttendanceScreen() {
               </div>
             </div>
 
-            <div className="mt-3 overflow-auto rounded-2xl border border-gray-100 bg-white shadow-card dark:border-[#1b2c2e] dark:bg-[#0c181a]">
+            <div className="attendance-table-container mt-3 w-full max-w-full overflow-auto rounded-2xl border border-gray-100 bg-white shadow-card dark:border-[#1b2c2e] dark:bg-[#0c181a] [--arid-col-w:6.25rem] sm:[--arid-col-w:10.5rem] [--name-col-w:7.5rem] sm:[--name-col-w:13rem] [--date-col-w:3.75rem] sm:[--date-col-w:4.75rem]">
               <div className="min-w-max">
                 <div
                   className="sticky top-0 z-20 grid border-b border-gray-200 bg-gray-50 dark:border-[#1b2c2e] dark:bg-[#122427]"
                   style={{ gridTemplateColumns: gridTemplate }}
                 >
-                  <div className="sticky left-0 z-30 border-r border-gray-200 bg-gray-50 px-3 py-2 text-xs font-extrabold text-gray-700 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-gray-200">
+                  <div className="sticky left-0 z-30 border-r border-gray-200 bg-gray-50 px-2 py-2 text-xs font-extrabold text-gray-700 dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-gray-200 sm:px-3">
                     ARID
                   </div>
                   <div
-                    className="sticky z-30 border-r border-gray-200 bg-gray-50 px-3 py-2 text-xs font-extrabold text-gray-700 shadow-[4px_0_8px_-6px_rgba(0,0,0,0.25)] dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-gray-200"
+                    className="sticky z-30 border-r border-gray-200 bg-gray-50 px-2 py-2 text-xs font-extrabold text-gray-700 shadow-[4px_0_8px_-6px_rgba(0,0,0,0.25)] dark:border-[#1b2c2e] dark:bg-[#122427] dark:text-gray-200 sm:px-3"
                     style={{ left: ARID_COL }}
                   >
                     Student
@@ -372,15 +376,16 @@ export default function TeacherAttendanceScreen() {
                 {(sheet.students || []).map((student) => (
                   <div
                     key={student.studentId}
-                    className="grid border-b border-gray-100 dark:border-[#1b2c2e]"
+                    className="grid border-b border-gray-100 hover:bg-gray-50/50 dark:border-[#1b2c2e] dark:hover:bg-[#0e2023]"
                     style={{ gridTemplateColumns: gridTemplate }}
                   >
-                    <div className="sticky left-0 z-10 truncate border-r border-gray-100 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:text-gray-300">
+                    <div className="sticky left-0 z-10 truncate border-r border-gray-100 bg-white px-2 py-1.5 text-xs font-semibold text-gray-600 dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:text-gray-300 sm:px-3" title={student.aridNo}>
                       {student.aridNo}
                     </div>
                     <div
-                      className="sticky z-10 truncate border-r border-gray-100 bg-white px-3 py-1.5 text-xs font-semibold text-gray-900 shadow-[4px_0_8px_-6px_rgba(0,0,0,0.25)] dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:text-white"
+                      className="sticky z-10 truncate border-r border-gray-100 bg-white px-2 py-1.5 text-xs font-semibold text-gray-900 shadow-[4px_0_8px_-6px_rgba(0,0,0,0.25)] dark:border-[#1b2c2e] dark:bg-[#0c181a] dark:text-white sm:px-3"
                       style={{ left: ARID_COL }}
+                      title={student.fullName}
                     >
                       {student.fullName}
                     </div>
@@ -396,7 +401,7 @@ export default function TeacherAttendanceScreen() {
                               aria-label={`${student.fullName} ${formatDateLabel(date)}`}
                               title={value || "Not marked"}
                               onChange={(e) => setCell(student.studentId, date, e.target.value)}
-                              className={`h-8 w-full rounded-md border border-gray-200 px-0.5 text-center text-xs font-bold ${statusClass(value)} dark:border-[#1b2c2e]`}
+                              className={`h-9 min-h-[36px] w-full rounded-md border border-gray-200 px-0.5 text-center text-xs font-bold ${statusClass(value)} dark:border-[#1b2c2e]`}
                             >
                               {STATUS_OPTIONS.map((opt) => (
                                 <option key={opt.value || "blank"} value={opt.value}>
